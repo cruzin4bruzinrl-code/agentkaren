@@ -220,12 +220,19 @@ function setProvBadge(p){$('#prov').textContent='⚡ '+(p?PROV[p].name:provOrder
 let CALLS=0;
 async function callProvider(p,messages){
   const P=PROV[p];
-  for(let a=0;a<4;a++){
+  for(let a=0;a<6;a++){
     checkAbort();
+    const gap=(PACE[p]||0)-(Date.now()-(LAST[p]||0));if(gap>0)await sleep(gap);LAST[p]=Date.now();
     const body={model:S.models[p]||undefined,messages,temperature:.4};
     if(p==='pollinations'&&!S.keys.pollinations)body.referrer='agentkaren';
     const r=await tfetch(P.url(),{method:'POST',headers:{'Content-Type':'application/json',...(S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{})},body:JSON.stringify(body)},90000);
     if(r.status===429||r.status===503||r.status===502){
+      const et=r.status===429?await r.text().catch(()=>''):'';
+      if(r.status===429&&(a>=1||/limit:\s*0|per.?day|daily|exhausted/i.test(et))){
+        const alt=await pickModel(p,!/lite/.test(S.models[p]));
+        if(alt&&alt!==S.models[p]&&!TRIED.has(p+alt)){TRIED.add(p+alt);sys(`${P.name}: kvoten slut för ${S.models[p]} – byter till ${alt}`);S.models[p]=alt;saveS();continue}
+        if(a>=2)throw new Error(P.name+': kvoten är slut just nu');
+      }
       const w=(+r.headers.get('retry-after')||0)*1000||7000*(a+1);
       sys(`${P.name}: kvot/överbelastning – väntar ${Math.round(w/1000)} s…`);await sleep(Math.min(w,45000));continue;
     }
@@ -246,12 +253,13 @@ async function callProvider(p,messages){
   }
   throw new Error(P.name+': för många försök');
 }
-async function pickModel(p){
+const PACE={gemini:4500},LAST={},TRIED=new Set();
+async function pickModel(p,lite){
   try{
     const base=PROV[p].url().replace(/\/chat\/completions$/,'');
     const r=await tfetch(base+'/models',{headers:S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{}},15000);
     const ids=((await r.json()).data||[]).map(m=>String(m.id).replace(/^models\//,''));
-    const pref=p==='gemini'?ids.filter(i=>/flash/.test(i)&&!/lite|image|tts|audio|live|exp|preview|embed/.test(i)):ids;
+    const pref=p==='gemini'?ids.filter(i=>/flash/.test(i)&&(lite?/lite/.test(i):!/lite/.test(i))&&!/image|tts|audio|live|exp|embed|thinking/.test(i)):ids;
     pref.sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));return pref[0]||ids[0];
   }catch{return null}
 }
