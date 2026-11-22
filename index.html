@@ -195,7 +195,7 @@ async function tfetch(url,opt={},ms=20000){
 }
 
 /* ========== Inställningar ========== */
-const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',custom:''},
+const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',pollinations:'',custom:''},
   models:{gemini:'gemini-2.5-flash',groq:'llama-3.3-70b-versatile',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
   customUrl:'',proxy:'',maxSteps:20,subSteps:12};
 let S;try{const o=JSON.parse(localStorage.ak_set||'{}');S={...DEF,...o,keys:{...DEF.keys,...o.keys},models:{...DEF.models,...o.models}}}catch{S=structuredClone(DEF)}
@@ -205,13 +205,13 @@ const PROV={
   gemini:{name:'Gemini',url:()=>'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',link:'https://aistudio.google.com/apikey'},
   groq:{name:'Groq',url:()=>'https://api.groq.com/openai/v1/chat/completions',link:'https://console.groq.com/keys'},
   openrouter:{name:'OpenRouter',url:()=>'https://openrouter.ai/api/v1/chat/completions',link:'https://openrouter.ai/keys'},
-  pollinations:{name:'Pollinations',url:()=>'https://text.pollinations.ai/openai',nokey:true},
+  pollinations:{name:'Pollinations',url:()=>S.keys.pollinations?'https://gen.pollinations.ai/v1/chat/completions':'https://text.pollinations.ai/openai',link:'https://enter.pollinations.ai'},
   custom:{name:'Egen',url:()=>S.customUrl}
 };
 function provOrder(){
   if(S.provider!=='auto')return S.provider==='pollinations'?['pollinations']:[S.provider,'pollinations'];
-  const o=['gemini','groq','openrouter','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));
-  o.push('pollinations');return o;
+  const o=['gemini','groq','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));
+  if(!o.includes('pollinations'))o.push('pollinations');return o;
 }
 function setProvBadge(p){$('#prov').textContent='⚡ '+(p?PROV[p].name:provOrder().map(x=>PROV[x].name)[0])}
 
@@ -222,8 +222,8 @@ async function callProvider(p,messages){
   for(let a=0;a<4;a++){
     checkAbort();
     const body={model:S.models[p]||undefined,messages,temperature:.4};
-    if(p==='pollinations')body.referrer='agentkaren';
-    const r=await tfetch(P.url(),{method:'POST',headers:{'Content-Type':'application/json',...(S.keys[p]&&!P.nokey?{Authorization:'Bearer '+S.keys[p]}:{})},body:JSON.stringify(body)},90000);
+    if(p==='pollinations'&&!S.keys.pollinations)body.referrer='agentkaren';
+    const r=await tfetch(P.url(),{method:'POST',headers:{'Content-Type':'application/json',...(S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{})},body:JSON.stringify(body)},90000);
     if(r.status===429||r.status===503||r.status===502){
       const w=(+r.headers.get('retry-after')||0)*1000||7000*(a+1);
       sys(`${P.name}: kvot/överbelastning – väntar ${Math.round(w/1000)} s…`);await sleep(Math.min(w,45000));continue;
@@ -492,6 +492,17 @@ async function delegateParallel({jobs=[]},ctx){
 }
 const TOOLS={search,read_page:readPage,scrape,links,fetch_json:fetchJson,run_js:runJs,save_file:saveFile,image,note,delegate,delegate_parallel:delegateParallel};
 
+const hasKey=()=>['gemini','groq','openrouter','pollinations'].some(p=>S.keys[p])||(S.keys.custom&&S.customUrl);
+function keyCard(task){
+  const d=document.createElement('div');d.className='res';
+  d.innerHTML=`<div class="hd" style="color:#ffd36e">🔑 Teamet behöver en AI-nyckel</div><div class="md"><p>Den gratis AI:n utan nyckel är nedlagd. En <b>gratis Gemini-nyckel</b> tar 1 minut:</p><ol><li>Öppna <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> och logga in med Google</li><li>Tryck <b>Create API key</b> och kopiera den</li><li>Klistra in här</li></ol></div>
+  <div class="fld"><input id="kq" type="password" placeholder="AIza…" autocomplete="off"></div><div class="acts"><button id="kqs" class="file" style="font-weight:700">✅ Spara & kör uppdraget</button><button id="kqp">📋 Klistra in</button></div>`;
+  feed.append(d);scrollEnd();
+  d.querySelector('#kqp').onclick=async()=>{try{d.querySelector('#kq').value=(await navigator.clipboard.readText()).trim()}catch{toast('Klistra in manuellt')}};
+  d.querySelector('#kqs').onclick=()=>{const v=d.querySelector('#kq').value.trim();if(v.length<20)return toast('Ogiltig nyckel');
+    if(/^sk_|^pk_/.test(v))S.keys.pollinations=v;else if(/^gsk_/.test(v))S.keys.groq=v;else if(/^sk-or-/.test(v))S.keys.openrouter=v;else S.keys.gemini=v;
+    saveS();setProvBadge();d.remove();toast('Nyckel sparad');if(task){CONV=null;inp.value=task;start()}};
+}
 /* ========== UI ========== */
 const feed=$('#feed'),main=$('#main'),inp=$('#inp'),go=$('#go');
 let RUN={busy:false,ctrl:null},CONV=null,CUR=null;
@@ -565,6 +576,7 @@ function userBubble(t){const d=document.createElement('div');d.className='user';
 
 async function start(){
   const task=inp.value.trim();if(!task||RUN.busy)return;
+  if(!hasKey()){inp.value='';$('#hero').style.display='none';userBubble(task);keyCard(task);return}
   inp.value='';autosize();$('#hero').style.display='none';
   RUN={busy:true,ctrl:new AbortController()};go.classList.add('stop');go.textContent='■';
   userBubble(task);resetTeam();
@@ -576,6 +588,7 @@ async function start(){
     CUR.turns.push({q:task,a:final});CUR.files=FILES;saveHist(CUR);
   }catch(e){
     if(isAbort(e)||RUN.ctrl.signal.aborted)sys('⏹ Uppdraget stoppades.');
+    else if(!hasKey()){CONV=null;keyCard(task)}
     else{const ev=emit('chef','err','Något gick fel: '+e.message);ev.querySelector('.who').textContent='Fel'}
   }finally{
     RUN.busy=false;go.classList.remove('stop');go.textContent='➤';
@@ -615,9 +628,9 @@ $('#bSet').onclick=()=>{
   const opt=(v,l)=>`<option value="${v}"${S.provider===v?' selected':''}>${l}</option>`;
   const key=(p,l)=>`<div class="fld"><label>${l}-nyckel</label><input type="password" id="k_${p}" value="${esc(S.keys[p])}" placeholder="Valfri" autocomplete="off"><small>Gratis nyckel: <a href="${PROV[p].link}" target="_blank" rel="noopener">${PROV[p].link.replace('https://','')}</a></small></div>`;
   const mod=(p,l)=>`<div class="fld"><label>${l}</label><input id="m_${p}" value="${esc(S.models[p])}"></div>`;
-  openSheet(`<h3>Inställningar</h3><p class="hint">Utan nyckel körs Pollinations (gratis, men långsam och kvotbegränsad). En gratis Gemini- eller Groq-nyckel gör agenterna mycket snabbare och smartare. Nycklar sparas bara på din enhet.</p>
-  <div class="fld"><label>AI-leverantör</label><select id="s_prov">${opt('auto','Auto – bästa tillgängliga')}${opt('gemini','Google Gemini')}${opt('groq','Groq')}${opt('openrouter','OpenRouter')}${opt('pollinations','Pollinations (ingen nyckel)')}${opt('custom','Egen OpenAI-kompatibel')}</select></div>
-  ${key('gemini','Gemini')}${key('groq','Groq')}${key('openrouter','OpenRouter')}
+  openSheet(`<h3>Inställningar</h3><p class="hint">Lägg in minst en nyckel. Bäst gratis: Gemini (aistudio.google.com/apikey). Groq är också gratis och mycket snabbt. Med flera nycklar byter appen automatiskt om en tar slut på kvot. Nycklar sparas bara på din enhet.</p>
+  <div class="fld"><label>AI-leverantör</label><select id="s_prov">${opt('auto','Auto – bästa tillgängliga')}${opt('gemini','Google Gemini')}${opt('groq','Groq')}${opt('openrouter','OpenRouter')}${opt('pollinations','Pollinations')}${opt('custom','Egen OpenAI-kompatibel')}</select></div>
+  ${key('gemini','Gemini')}${key('groq','Groq')}${key('openrouter','OpenRouter')}${key('pollinations','Pollinations')}
   <h4 class="sec">Modeller</h4><div class="row2">${mod('gemini','Gemini')}${mod('groq','Groq')}${mod('openrouter','OpenRouter')}${mod('pollinations','Pollinations')}</div>
   <h4 class="sec">Egen leverantör</h4>
   <div class="fld"><label>URL (chat/completions)</label><input id="s_curl" value="${esc(S.customUrl)}" placeholder="https://…/v1/chat/completions"></div>
@@ -627,7 +640,7 @@ $('#bSet').onclick=()=>{
   <div class="row2"><div class="fld"><label>Max steg – Chef</label><input type="number" id="s_ms" value="${S.maxSteps}" min="4" max="40"></div><div class="fld"><label>Max steg – agenter</label><input type="number" id="s_ss" value="${S.subSteps}" min="3" max="30"></div></div>
   <button class="prim" id="s_save">Spara</button>`);
   $('#s_save').onclick=()=>{
-    S.provider=$('#s_prov').value;['gemini','groq','openrouter','custom'].forEach(p=>S.keys[p]=$('#k_'+p).value.trim());
+    S.provider=$('#s_prov').value;['gemini','groq','openrouter','pollinations','custom'].forEach(p=>S.keys[p]=$('#k_'+p).value.trim());
     ['gemini','groq','openrouter','pollinations','custom'].forEach(p=>S.models[p]=$('#m_'+p).value.trim());
     S.customUrl=$('#s_curl').value.trim();S.proxy=$('#s_proxy').value.trim();
     S.maxSteps=Math.max(4,+$('#s_ms').value||16);S.subSteps=Math.max(3,+$('#s_ss').value||10);
