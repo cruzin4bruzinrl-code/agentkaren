@@ -197,10 +197,11 @@ async function tfetch(url,opt={},ms=20000){
 
 /* ========== Inställningar ========== */
 const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',pollinations:'',custom:''},
-  models:{gemini:'gemini-3.8-flash',groq:'llama-3.3-70b-versatile',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
+  models:{gemini:'gemini-3.8-flash',groq:'openai/gpt-oss-120b',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
   customUrl:'',proxy:'',maxSteps:20,subSteps:12};
 let S;try{const o=JSON.parse(localStorage.ak_set||'{}');S={...DEF,...o,keys:{...DEF.keys,...o.keys},models:{...DEF.models,...o.models}}}catch{S=structuredClone(DEF)}
 const saveS=()=>localStorage.ak_set=JSON.stringify(S);
+for(const p of ['groq','openrouter'])if(!S.models[p]||/whisper|tts|guard|embed|playai|orpheus|distil|audio|speech/i.test(S.models[p]))S.models[p]=DEF.models[p];
 
 const PROV={
   gemini:{name:'Gemini',url:()=>'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',link:'https://aistudio.google.com/apikey'},
@@ -254,7 +255,8 @@ async function callProvider(p,messages){
       // Modellen utfasad? Byt automatiskt till den modell API:et föreslår, eller hämta en ny.
       if((r.status===404||r.status===400)&&/model/i.test(et)&&a<3){
         const sug=et.match(/use (?:models\/)?([\w.\-]+)/i)?.[1];
-        const nm=sug&&sug!==S.models[p]?sug:await pickModel(p);
+        const nm=sug&&sug!==S.models[p]&&chatOk(sug)?sug:await pickModel(p);
+        TRIED.add(p+S.models[p]);
         if(nm&&nm!==S.models[p]){sys(`${P.name}: byter modell ${S.models[p]} → ${nm}`);S.models[p]=nm;saveS();continue}
       }
       throw new Error(`${P.name} ${r.status}: ${et.slice(0,200)}`);
@@ -267,10 +269,14 @@ async function callProvider(p,messages){
   throw new Error(P.name+': för många försök');
 }
 const PACE={gemini:4500,groq:1500},LAST={},TRIED=new Set(),COOL={};let NOREASON=false;
+const chatOk=id=>!/whisper|tts|guard|embed|playai|orpheus|distil|audio|speech|transcri|moderation|image|vision-preview|compound|allam/i.test(id);
+const CHAT_PREF=[/gpt-oss-120b/,/llama-4-maverick/,/kimi-k2/,/llama-3\.3-70b/,/qwen3?-.*32b/,/llama-4-scout/,/gpt-oss-20b/,/deepseek/,/llama/];
+function rankChat(ids){const r=i=>{const k=CHAT_PREF.findIndex(x=>x.test(i));return k<0?99:k};return ids.filter(chatOk).sort((a,b)=>r(a)-r(b)||b.localeCompare(a,undefined,{numeric:true}))}
 let MODELS={};
 async function nextModel(p){
   if(!MODELS[p]){try{const base=PROV[p].url().replace(/\/chat\/completions$/,'');const r=await tfetch(base+'/models',{headers:S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{}},15000);MODELS[p]=((await r.json()).data||[]).map(m=>String(m.id).replace(/^models\//,''))}catch{MODELS[p]=[]}}
   let c=MODELS[p];
+  if(p!=='gemini')c=rankChat(c);
   if(p==='gemini')c=c.filter(i=>/^gemini/.test(i)&&/flash/.test(i)&&!/image|tts|audio|live|embed|thinking|exp/.test(i)).sort((a,b)=>(/lite/.test(b)-/lite/.test(a))||b.localeCompare(a,undefined,{numeric:true}));
   return c.find(m=>!TRIED.has(p+m))||null;
 }
@@ -279,8 +285,8 @@ async function pickModel(p,lite){
     const base=PROV[p].url().replace(/\/chat\/completions$/,'');
     const r=await tfetch(base+'/models',{headers:S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{}},15000);
     const ids=((await r.json()).data||[]).map(m=>String(m.id).replace(/^models\//,''));
-    const pref=p==='gemini'?ids.filter(i=>/flash/.test(i)&&(lite?/lite/.test(i):!/lite/.test(i))&&!/image|tts|audio|live|exp|embed|thinking/.test(i)):ids;
-    pref.sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));return pref[0]||ids[0];
+    if(p==='gemini'){const pref=ids.filter(i=>/flash/.test(i)&&(lite?/lite/.test(i):!/lite/.test(i))&&!/image|tts|audio|live|exp|embed|thinking/.test(i));pref.sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));return pref[0]||null}
+    return rankChat(ids).find(m=>!TRIED.has(p+m)&&m!==S.models[p])||null;
   }catch{return null}
 }
 let WAITEL=null;
