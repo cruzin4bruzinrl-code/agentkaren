@@ -120,7 +120,7 @@ textarea::placeholder{color:#7d83a8}
 .hi b{display:block;font-size:14px;margin-bottom:3px}
 .hi span{font-size:11.5px;color:var(--mut)}
 .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(30,34,64,.95);border:1px solid var(--line);padding:10px 16px;border-radius:99px;font-size:13px;z-index:30;animation:in .3s}
-#office{position:relative;height:38vh;min-height:210px;margin:2px 12px 8px;border-radius:24px;overflow:hidden;border:1px solid var(--line);display:none;transition:height .45s cubic-bezier(.2,.9,.3,1);box-shadow:0 10px 40px rgba(0,0,0,.4);background:#141726}
+#office{position:relative;z-index:1;isolation:isolate;height:38vh;min-height:210px;margin:2px 12px 8px;border-radius:24px;overflow:hidden;border:1px solid var(--line);display:none;transition:height .45s cubic-bezier(.2,.9,.3,1);box-shadow:0 10px 40px rgba(0,0,0,.4);background:#141726}
 body.has3d #office{display:block}body.has3d .team{display:none}
 #office.big{height:66vh}
 #gl{position:absolute;inset:0;width:100%;height:100%;touch-action:none;image-rendering:auto;filter:saturate(1.12) contrast(1.05)}
@@ -209,10 +209,10 @@ const PROV={
   pollinations:{name:'Pollinations',url:()=>S.keys.pollinations?'https://gen.pollinations.ai/v1/chat/completions':'https://text.pollinations.ai/openai',link:'https://enter.pollinations.ai'},
   custom:{name:'Egen',url:()=>S.customUrl}
 };
-function provAuto(){const o=['gemini','groq','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));return o}
+function provAuto(){const o=['groq','gemini','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));return o}
 function provOrder(){
   if(S.provider!=='auto')return [S.provider,...provAuto().filter(p=>p!==S.provider)];
-  const o=['gemini','groq','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));
+  const o=['groq','gemini','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));
   return o.length?o:['pollinations'];
 }
 function setProvBadge(p){$('#prov').textContent='⚡ '+(p?PROV[p].name:provOrder().map(x=>PROV[x].name)[0])}
@@ -231,6 +231,10 @@ async function callProvider(p,messages){
     catch(e){if(isAbort(e))throw e;if(a<3){sys(`${P.name}: ${e.name==='AbortError'?'svarade inte i tid':'nätverksfel'} – försöker igen…`);await sleep(2500*(a+1));continue}throw e}
     if(r.status===429||r.status===503||r.status===502){
       const et=r.status===429?await r.text().catch(()=>''):'';
+      const rd0=+(et.match(/retryDelay"\s*:\s*"(\d+)/)?.[1]||0);
+      const cw=rd0*1000||(+r.headers.get('retry-after')||0)*1000||20000;
+      COOL[p]=Date.now()+Math.max(cw,8000);
+      if(provOrder().some(x=>x!==p&&!(COOL[x]>Date.now()))){throw new Error(P.name+': kvot nådd')}
       if(r.status===429){
         TRIED.add(p+S.models[p]);
         const hard=/limit:\s*0|per.?day|PerDay|daily|exhausted|billing/i.test(et);
@@ -262,7 +266,7 @@ async function callProvider(p,messages){
   }
   throw new Error(P.name+': för många försök');
 }
-const PACE={gemini:4500},LAST={},TRIED=new Set();let NOREASON=false;
+const PACE={gemini:4500,groq:1500},LAST={},TRIED=new Set(),COOL={};let NOREASON=false;
 let MODELS={};
 async function nextModel(p){
   if(!MODELS[p]){try{const base=PROV[p].url().replace(/\/chat\/completions$/,'');const r=await tfetch(base+'/models',{headers:S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{}},15000);MODELS[p]=((await r.json()).data||[]).map(m=>String(m.id).replace(/^models\//,''))}catch{MODELS[p]=[]}}
@@ -287,8 +291,15 @@ async function llm(messages){
 }
 async function llm2(messages){
   let last;
-  for(const p of provOrder()){
-    try{return await callProvider(p,messages)}catch(e){if(isAbort(e))throw e;last=e;sys('⚠️ '+e.message+' – provar nästa leverantör')}
+  for(let round=0;round<4;round++){
+    const now=Date.now();
+    const ord=provOrder().sort((a,b)=>((COOL[a]||0)>now)-((COOL[b]||0)>now));
+    for(const p of ord){
+      try{return await callProvider(p,messages)}catch(e){if(isAbort(e))throw e;last=e;sys('⚠️ '+e.message+(ord.length>1?' – provar nästa':''))}
+    }
+    if(!/kvot/i.test(last?.message||''))break;
+    const w=Math.min(30000,Math.max(3000,Math.min(...provOrder().map(p=>(COOL[p]||0)-Date.now()))));
+    sys(`⏸ Alla AI-tjänster har nått sin kvot – väntar ${Math.round(w/1000)} s och fortsätter…`);await sleep(w);
   }
   throw last||new Error('Ingen AI-leverantör tillgänglig');
 }
