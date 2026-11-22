@@ -197,10 +197,11 @@ async function tfetch(url,opt={},ms=20000){
 
 /* ========== Inställningar ========== */
 const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',pollinations:'',custom:''},
-  models:{gemini:'gemini-3.8-flash',groq:'openai/gpt-oss-120b',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
+  models:{gemini:'gemini-3.8-flash',groq:'auto',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
   customUrl:'',proxy:'',maxSteps:20,subSteps:12};
 let S;try{const o=JSON.parse(localStorage.ak_set||'{}');S={...DEF,...o,keys:{...DEF.keys,...o.keys},models:{...DEF.models,...o.models}}}catch{S=structuredClone(DEF)}
 const saveS=()=>localStorage.ak_set=JSON.stringify(S);
+if(S.models.groq==='openai/gpt-oss-120b')S.models.groq='auto';
 for(const p of ['groq','openrouter'])if(!S.models[p]||/whisper|tts|guard|embed|playai|orpheus|distil|audio|speech/i.test(S.models[p]))S.models[p]=DEF.models[p];
 
 const PROV={
@@ -225,7 +226,9 @@ async function callProvider(p,messages){
   for(let a=0;a<6;a++){
     checkAbort();
     const gap=(PACE[p]||0)-(Date.now()-(LAST[p]||0));if(gap>0)await sleep(gap);LAST[p]=Date.now();
+    if(S.models[p]==='auto'||(!S.models[p]&&p!=='custom')){const m=await nextModel(p);if(m){S.models[p]=m;saveS()}}
     const body={model:S.models[p]||undefined,messages,temperature:.4};
+    if(/gpt-oss/.test(S.models[p]||''))body.reasoning_effort='low';
     if(p==='pollinations'&&!S.keys.pollinations)body.referrer='agentkaren';
     let url=P.url(),hdr={'Content-Type':'application/json',...(S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{})},payload=body;
     if(p==='gemini'){ // Googles eget API – stabilare CORS från webbläsare
@@ -242,10 +245,11 @@ async function callProvider(p,messages){
       const rd0=+(et.match(/retryDelay"\s*:\s*"(\d+)/)?.[1]||0);
       const cw=rd0*1000||(+r.headers.get('retry-after')||0)*1000||20000;
       COOL[p]=Date.now()+Math.max(cw,8000);
+      const hard=r.status===429&&/limit:\s*0|per.?day|PerDay|daily|exhausted|billing/i.test(et);
+      if(hard){TRIED.add(p+S.models[p]);const alt=await nextModel(p);if(alt){sys(`${P.name}: ingen gratiskvot på ${S.models[p]} – byter till ${alt}`);S.models[p]=alt;saveS();delete COOL[p];continue}}
       if(provOrder().some(x=>x!==p&&!(COOL[x]>Date.now()))){throw new Error(P.name+': kvot nådd')}
       if(r.status===429){
         TRIED.add(p+S.models[p]);
-        const hard=/limit:\s*0|per.?day|PerDay|daily|exhausted|billing/i.test(et);
         if(hard||a>=1){
           const alt=await nextModel(p);
           if(alt){sys(`${P.name}: gratiskvoten slut för ${S.models[p]} – byter till ${alt}`);S.models[p]=alt;saveS();continue}
@@ -270,14 +274,19 @@ async function callProvider(p,messages){
     }
     const j=await r.json();let c=p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).filter(x=>!x.thought).map(x=>x.text||'').join(''):j.choices?.[0]?.message?.content;
     if(Array.isArray(c))c=c.map(x=>x.text||'').join('');
-    if(!c)throw new Error(P.name+': tomt svar');
+    if(!c){const msg=j.choices?.[0]?.message||{};c=msg.reasoning||msg.reasoning_content||''}
+    if(!c||!c.trim()){
+      TRIED.add(p+S.models[p]);const alt=a<4?await nextModel(p):null;
+      if(alt){sys(`${P.name}: ${S.models[p]} gav tomt svar – byter till ${alt}`);S.models[p]=alt;saveS();continue}
+      throw new Error(P.name+': tomt svar');
+    }
     CALLS++;setProvBadge(p);return c;
   }
   throw new Error(P.name+': för många försök');
 }
 const PACE={gemini:4500,groq:1500},LAST={},TRIED=new Set(),COOL={};let NOREASON=false;
 const chatOk=id=>!/whisper|tts|guard|embed|playai|orpheus|distil|audio|speech|transcri|moderation|image|vision-preview|compound|allam/i.test(id);
-const CHAT_PREF=[/gpt-oss-120b/,/llama-4-maverick/,/kimi-k2/,/llama-3\.3-70b/,/qwen3?-.*32b/,/llama-4-scout/,/gpt-oss-20b/,/deepseek/,/llama/];
+const CHAT_PREF=[/kimi-k2/,/llama-4-maverick/,/llama-3\.3-70b/,/llama-4-scout/,/qwen3?-.*32b/,/gpt-oss-120b/,/gpt-oss-20b/,/deepseek/,/llama/];
 function rankChat(ids){const r=i=>{const k=CHAT_PREF.findIndex(x=>x.test(i));return k<0?99:k};return ids.filter(chatOk).sort((a,b)=>r(a)-r(b)||b.localeCompare(a,undefined,{numeric:true}))}
 let MODELS={};
 async function listModels(p){
