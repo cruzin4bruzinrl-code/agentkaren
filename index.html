@@ -231,12 +231,17 @@ async function callProvider(p,messages){
     catch(e){if(isAbort(e))throw e;if(a<3){sys(`${P.name}: ${e.name==='AbortError'?'svarade inte i tid':'nätverksfel'} – försöker igen…`);await sleep(2500*(a+1));continue}throw e}
     if(r.status===429||r.status===503||r.status===502){
       const et=r.status===429?await r.text().catch(()=>''):'';
-      if(r.status===429&&(a>=1||/limit:\s*0|per.?day|daily|exhausted/i.test(et))){
-        const alt=await pickModel(p,!/lite/.test(S.models[p]));
-        if(alt&&alt!==S.models[p]&&!TRIED.has(p+alt)){TRIED.add(p+alt);sys(`${P.name}: kvoten slut för ${S.models[p]} – byter till ${alt}`);S.models[p]=alt;saveS();continue}
-        if(a>=2)throw new Error(P.name+': kvoten är slut just nu');
+      if(r.status===429){
+        TRIED.add(p+S.models[p]);
+        const hard=/limit:\s*0|per.?day|PerDay|daily|exhausted|billing/i.test(et);
+        if(hard||a>=1){
+          const alt=await nextModel(p);
+          if(alt){sys(`${P.name}: gratiskvoten slut för ${S.models[p]} – byter till ${alt}`);S.models[p]=alt;saveS();continue}
+          throw new Error(P.name+': gratiskvoten är slut just nu (alla modeller). '+(et.match(/"message"\s*:\s*"([^"]{0,140})/)?.[1]||''));
+        }
       }
-      const w=(+r.headers.get('retry-after')||0)*1000||7000*(a+1);
+      const rd=+(et.match(/retryDelay"\s*:\s*"(\d+)/)?.[1]||0);
+      const w=rd*1000||(+r.headers.get('retry-after')||0)*1000||7000*(a+1);
       sys(`${P.name}: kvot/överbelastning – väntar ${Math.round(w/1000)} s…`);await sleep(Math.min(w,45000));continue;
     }
     if(!r.ok){
@@ -258,6 +263,13 @@ async function callProvider(p,messages){
   throw new Error(P.name+': för många försök');
 }
 const PACE={gemini:4500},LAST={},TRIED=new Set();let NOREASON=false;
+let MODELS={};
+async function nextModel(p){
+  if(!MODELS[p]){try{const base=PROV[p].url().replace(/\/chat\/completions$/,'');const r=await tfetch(base+'/models',{headers:S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{}},15000);MODELS[p]=((await r.json()).data||[]).map(m=>String(m.id).replace(/^models\//,''))}catch{MODELS[p]=[]}}
+  let c=MODELS[p];
+  if(p==='gemini')c=c.filter(i=>/^gemini/.test(i)&&/flash/.test(i)&&!/image|tts|audio|live|embed|thinking|exp/.test(i)).sort((a,b)=>(/lite/.test(b)-/lite/.test(a))||b.localeCompare(a,undefined,{numeric:true}));
+  return c.find(m=>!TRIED.has(p+m))||null;
+}
 async function pickModel(p,lite){
   try{
     const base=PROV[p].url().replace(/\/chat\/completions$/,'');
@@ -530,10 +542,12 @@ async function delegateParallel({jobs=[]},ctx){
 const TOOLS={search,read_page:readPage,scrape,links,fetch_json:fetchJson,run_js:runJs,save_file:saveFile,image,note,delegate,delegate_parallel:delegateParallel};
 
 const hasKey=()=>['gemini','groq','openrouter','pollinations'].some(p=>S.keys[p])||(S.keys.custom&&S.customUrl);
-function keyCard(task){
+function keyCard(task,kind){
   const d=document.createElement('div');d.className='res';
-  d.innerHTML=`<div class="hd" style="color:#ffd36e">🔑 Teamet behöver en AI-nyckel</div><div class="md"><p>Den gratis AI:n utan nyckel är nedlagd. En <b>gratis Gemini-nyckel</b> tar 1 minut:</p><ol><li>Öppna <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> och logga in med Google</li><li>Tryck <b>Create API key</b> och kopiera den</li><li>Klistra in här</li></ol></div>
-  <div class="fld"><input id="kq" type="password" placeholder="AIza…" autocomplete="off"></div><div class="acts"><button id="kqs" class="file" style="font-weight:700">✅ Spara & kör uppdraget</button><button id="kqp">📋 Klistra in</button></div>`;
+  d.innerHTML=kind==='groq'?`<div class="hd" style="color:#ffd36e">⚡ Lägg till Groq som reserv</div><div class="md"><p>Geminis gratiskvot räcker inte för ett helt agentteam. <b>Groq</b> är gratis, mycket snabbt och tar över automatiskt:</p><ol><li>Öppna <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> och logga in</li><li>Tryck <b>Create API Key</b> och kopiera (börjar med gsk_)</li><li>Klistra in här</li></ol></div>`
+  :`<div class="hd" style="color:#ffd36e">🔑 Teamet behöver en AI-nyckel</div><div class="md"><p>Den gratis AI:n utan nyckel är nedlagd. En <b>gratis Gemini-nyckel</b> tar 1 minut:</p><ol><li>Öppna <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> och logga in med Google</li><li>Tryck <b>Create API key</b> och kopiera den</li><li>Klistra in här</li></ol></div>`;
+  d.innerHTML+=`
+  <div class="fld"><input id="kq" type="password" placeholder="${kind==='groq'?'gsk_…':'AIza… / AQ.…'}" autocomplete="off"></div><div class="acts"><button id="kqs" class="file" style="font-weight:700">✅ Spara & kör uppdraget</button><button id="kqp">📋 Klistra in</button></div>`;
   feed.append(d);scrollEnd();
   d.querySelector('#kqp').onclick=async()=>{try{d.querySelector('#kq').value=(await navigator.clipboard.readText()).trim()}catch{toast('Klistra in manuellt')}};
   d.querySelector('#kqs').onclick=()=>{const v=d.querySelector('#kq').value.trim();if(v.length<20)return toast('Ogiltig nyckel');
@@ -627,6 +641,7 @@ async function start(){
   }catch(e){
     if(isAbort(e)||RUN.ctrl.signal.aborted)sys('⏹ Uppdraget stoppades.');
     else if(!hasKey()){CONV=null;keyCard(task)}
+    else if(/kvot/i.test(e.message)&&!S.keys.groq){const ev=emit('chef','err',e.message);ev.querySelector('.who').textContent='Kvot slut';CONV=null;keyCard(task,'groq')}
     else{const ev=emit('chef','err','Något gick fel: '+e.message);ev.querySelector('.who').textContent='Fel'}
   }finally{
     try{wl?.release()}catch{}
