@@ -64,6 +64,7 @@ main{flex:1;overflow-y:auto;padding:4px 14px 20px;scroll-behavior:smooth}
 .ev .who{font-size:11px;font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.6px}
 .ev.think .tx{color:#c9cdea;font-style:italic}
 .ev.sys{--c:#666;color:var(--mut);font-size:12.5px}
+.ev.wait{border-left-color:var(--pri);animation:in .35s ease,breath 1.6s ease-in-out infinite}@keyframes breath{50%{opacity:.55}}
 .ev.err{--c:var(--err)}
 .ev details{margin-top:6px}
 .ev summary{font-size:12px;color:var(--pri);cursor:pointer}
@@ -224,8 +225,10 @@ async function callProvider(p,messages){
     checkAbort();
     const gap=(PACE[p]||0)-(Date.now()-(LAST[p]||0));if(gap>0)await sleep(gap);LAST[p]=Date.now();
     const body={model:S.models[p]||undefined,messages,temperature:.4};
+    if(p==='gemini'&&!NOREASON)body.reasoning_effort='low';
     if(p==='pollinations'&&!S.keys.pollinations)body.referrer='agentkaren';
-    const r=await tfetch(P.url(),{method:'POST',headers:{'Content-Type':'application/json',...(S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{})},body:JSON.stringify(body)},90000);
+    let r;try{r=await tfetch(P.url(),{method:'POST',headers:{'Content-Type':'application/json',...(S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{})},body:JSON.stringify(body)},120000)}
+    catch(e){if(isAbort(e))throw e;if(a<3){sys(`${P.name}: ${e.name==='AbortError'?'svarade inte i tid':'nätverksfel'} – försöker igen…`);await sleep(2500*(a+1));continue}throw e}
     if(r.status===429||r.status===503||r.status===502){
       const et=r.status===429?await r.text().catch(()=>''):'';
       if(r.status===429&&(a>=1||/limit:\s*0|per.?day|daily|exhausted/i.test(et))){
@@ -238,6 +241,7 @@ async function callProvider(p,messages){
     }
     if(!r.ok){
       const et=await r.text();
+      if(r.status===400&&/reasoning/i.test(et)&&!NOREASON){NOREASON=true;continue}
       // Modellen utfasad? Byt automatiskt till den modell API:et föreslår, eller hämta en ny.
       if((r.status===404||r.status===400)&&/model/i.test(et)&&a<3){
         const sug=et.match(/use (?:models\/)?([\w.\-]+)/i)?.[1];
@@ -253,7 +257,7 @@ async function callProvider(p,messages){
   }
   throw new Error(P.name+': för många försök');
 }
-const PACE={gemini:4500},LAST={},TRIED=new Set();
+const PACE={gemini:4500},LAST={},TRIED=new Set();let NOREASON=false;
 async function pickModel(p,lite){
   try{
     const base=PROV[p].url().replace(/\/chat\/completions$/,'');
@@ -263,7 +267,13 @@ async function pickModel(p,lite){
     pref.sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));return pref[0]||ids[0];
   }catch{return null}
 }
+let WAITEL=null;
+function waitStart(){const d=document.createElement('div');d.className='ev sys wait';d.innerHTML='<div class="bd">⏳ Väntar på AI-svar… <b>0 s</b></div>';feed.append(d);scrollEnd();const t0=Date.now();const iv=setInterval(()=>{const b=d.querySelector('b');if(b)b.textContent=Math.round((Date.now()-t0)/1000)+' s'},1000);return()=>{clearInterval(iv);d.remove()}}
 async function llm(messages){
+  const stop=waitStart();
+  try{return await llm2(messages)}finally{stop()}
+}
+async function llm2(messages){
   let last;
   for(const p of provOrder()){
     try{return await callProvider(p,messages)}catch(e){if(isAbort(e))throw e;last=e;sys('⚠️ '+e.message+' – provar nästa leverantör')}
@@ -607,6 +617,7 @@ async function start(){
   inp.value='';autosize();$('#hero').style.display='none';
   RUN={busy:true,ctrl:new AbortController()};go.classList.add('stop');go.textContent='■';
   userBubble(task);resetTeam();
+  let wl=null;try{wl=await navigator.wakeLock?.request('screen')}catch{}
   const fresh=!CONV;if(fresh){CONV=[{role:'system',content:''}];FILES=[];NOTES=[];CUR={id:Date.now(),task,turns:[]};window.OFFICE?.task(task)}
   const before=FILES.length;
   try{
@@ -618,6 +629,7 @@ async function start(){
     else if(!hasKey()){CONV=null;keyCard(task)}
     else{const ev=emit('chef','err','Något gick fel: '+e.message);ev.querySelector('.who').textContent='Fel'}
   }finally{
+    try{wl?.release()}catch{}
     RUN.busy=false;go.classList.remove('stop');go.textContent='➤';
     Object.keys(AG).forEach(k=>{const el=document.getElementById('ag-'+k);if(el)el.classList.remove('on');if(el&&!el.classList.contains('done'))el.querySelector('span').textContent='Vilar'});
     inp.placeholder='Följ upp eller ge nytt uppdrag…';
