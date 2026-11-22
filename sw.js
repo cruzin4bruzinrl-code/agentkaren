@@ -1,5 +1,5 @@
 // Agentkåren service worker – nätverk först, så appen alltid uppdaterar sig själv
-const C='agentkaren-v9';
+const C='agentkaren-v10';
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['./','index.html','manifest.json','icon-192.png','icon-512.png'])))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{
