@@ -196,7 +196,7 @@ async function tfetch(url,opt={},ms=20000){
 
 /* ========== Inställningar ========== */
 const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',pollinations:'',custom:''},
-  models:{gemini:'gemini-2.5-flash',groq:'llama-3.3-70b-versatile',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
+  models:{gemini:'gemini-3.8-flash',groq:'llama-3.3-70b-versatile',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
   customUrl:'',proxy:'',maxSteps:20,subSteps:12};
 let S;try{const o=JSON.parse(localStorage.ak_set||'{}');S={...DEF,...o,keys:{...DEF.keys,...o.keys},models:{...DEF.models,...o.models}}}catch{S=structuredClone(DEF)}
 const saveS=()=>localStorage.ak_set=JSON.stringify(S);
@@ -208,10 +208,11 @@ const PROV={
   pollinations:{name:'Pollinations',url:()=>S.keys.pollinations?'https://gen.pollinations.ai/v1/chat/completions':'https://text.pollinations.ai/openai',link:'https://enter.pollinations.ai'},
   custom:{name:'Egen',url:()=>S.customUrl}
 };
+function provAuto(){const o=['gemini','groq','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));return o}
 function provOrder(){
-  if(S.provider!=='auto')return S.provider==='pollinations'?['pollinations']:[S.provider,'pollinations'];
+  if(S.provider!=='auto')return [S.provider,...provAuto().filter(p=>p!==S.provider)];
   const o=['gemini','groq','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));
-  if(!o.includes('pollinations'))o.push('pollinations');return o;
+  return o.length?o:['pollinations'];
 }
 function setProvBadge(p){$('#prov').textContent='⚡ '+(p?PROV[p].name:provOrder().map(x=>PROV[x].name)[0])}
 
@@ -228,13 +229,31 @@ async function callProvider(p,messages){
       const w=(+r.headers.get('retry-after')||0)*1000||7000*(a+1);
       sys(`${P.name}: kvot/överbelastning – väntar ${Math.round(w/1000)} s…`);await sleep(Math.min(w,45000));continue;
     }
-    if(!r.ok)throw new Error(`${P.name} ${r.status}: ${(await r.text()).slice(0,200)}`);
+    if(!r.ok){
+      const et=await r.text();
+      // Modellen utfasad? Byt automatiskt till den modell API:et föreslår, eller hämta en ny.
+      if((r.status===404||r.status===400)&&/model/i.test(et)&&a<3){
+        const sug=et.match(/use (?:models\/)?([\w.\-]+)/i)?.[1];
+        const nm=sug&&sug!==S.models[p]?sug:await pickModel(p);
+        if(nm&&nm!==S.models[p]){sys(`${P.name}: byter modell ${S.models[p]} → ${nm}`);S.models[p]=nm;saveS();continue}
+      }
+      throw new Error(`${P.name} ${r.status}: ${et.slice(0,200)}`);
+    }
     const j=await r.json();let c=j.choices?.[0]?.message?.content;
     if(Array.isArray(c))c=c.map(x=>x.text||'').join('');
     if(!c)throw new Error(P.name+': tomt svar');
     CALLS++;setProvBadge(p);return c;
   }
   throw new Error(P.name+': för många försök');
+}
+async function pickModel(p){
+  try{
+    const base=PROV[p].url().replace(/\/chat\/completions$/,'');
+    const r=await tfetch(base+'/models',{headers:S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{}},15000);
+    const ids=((await r.json()).data||[]).map(m=>String(m.id).replace(/^models\//,''));
+    const pref=p==='gemini'?ids.filter(i=>/flash/.test(i)&&!/lite|image|tts|audio|live|exp|preview|embed/.test(i)):ids;
+    pref.sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));return pref[0]||ids[0];
+  }catch{return null}
 }
 async function llm(messages){
   let last;
