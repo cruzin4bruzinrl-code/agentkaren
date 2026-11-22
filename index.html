@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#0a0c18">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Agentkåren</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#0a0c18;--glass:rgba(255,255,255,.06);--glass2:rgba(255,255,255,.1);--line:rgba(255,255,255,.12);
+  --tx:#eef0ff;--mut:#9aa0c3;--pri:#8ab4ff;--ok:#7ef0c1;--err:#ff7a8a;--r:22px;
+  font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx)}
+body{display:flex;flex-direction:column;overflow:hidden}
+.aurora{position:fixed;inset:0;z-index:-1;overflow:hidden;filter:blur(70px) saturate(140%);opacity:.55}
+.aurora i{position:absolute;width:60vmax;height:60vmax;border-radius:50%;animation:drift 22s ease-in-out infinite alternate}
+.aurora i:nth-child(1){background:#3b5bff;left:-20vmax;top:-25vmax}
+.aurora i:nth-child(2){background:#a43bff;right:-25vmax;top:10vmax;animation-duration:28s}
+.aurora i:nth-child(3){background:#00c9a7;left:10vmax;bottom:-35vmax;animation-duration:34s;opacity:.6}
+@keyframes drift{to{transform:translate(8vmax,6vmax) scale(1.15) rotate(40deg)}}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+header{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 12px) 16px 8px}
+.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:linear-gradient(135deg,#5b7cff,#b65bff);box-shadow:0 6px 20px rgba(110,90,255,.45)}
+header h1{font-size:19px;margin:0;letter-spacing:.3px;font-weight:800}
+header small{display:block;color:var(--mut);font-size:12px;font-weight:500}
+.hbtn{width:40px;height:40px;border-radius:14px;background:var(--glass);border:1px solid var(--line);display:grid;place-items:center;font-size:18px;backdrop-filter:blur(14px)}
+.sp{flex:1}
+#prov{font-size:11px;padding:4px 9px;border-radius:99px;background:var(--glass);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.team{display:flex;gap:10px;overflow-x:auto;padding:6px 16px 10px;scrollbar-width:none}
+.team::-webkit-scrollbar{display:none}
+.ag{flex:0 0 auto;width:92px;padding:10px 6px 9px;border-radius:20px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(16px);text-align:center;transition:.3s;position:relative}
+.ag.new{animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+.orb{width:46px;height:46px;margin:0 auto 6px;border-radius:50%;display:grid;place-items:center;font-size:22px;position:relative;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.25),transparent 60%),var(--c);box-shadow:0 0 0 0 var(--c)}
+.ag.on .orb{animation:pulse 1.4s infinite}
+.ag.on .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(var(--c),transparent 60%);-webkit-mask:radial-gradient(circle,transparent 62%,#000 64%);mask:radial-gradient(circle,transparent 62%,#000 64%);animation:spin 1s linear infinite}
+.ag.on{border-color:var(--c);background:rgba(255,255,255,.1)}
+.ag.done .orb::before{content:"✓";position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:var(--ok);color:#042;font-size:11px;font-weight:900;display:grid;place-items:center}
+@keyframes pulse{50%{box-shadow:0 0 22px 2px var(--c)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ag b{display:block;font-size:12.5px}
+.ag span{display:block;font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main{flex:1;overflow-y:auto;padding:4px 14px 20px;scroll-behavior:smooth}
+#hero{text-align:center;padding:26px 6px 10px}
+#hero h2{font-size:27px;line-height:1.15;margin:0 0 8px;font-weight:800;background:linear-gradient(90deg,#fff,#b9c6ff,#e2b8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+#hero p{color:var(--mut);margin:0 auto 18px;max-width:440px;font-size:14.5px;line-height:1.5}
+.chips{display:flex;flex-direction:column;gap:8px;max-width:520px;margin:0 auto}
+.chip{text-align:left;padding:12px 14px;border-radius:18px;background:var(--glass);border:1px solid var(--line);font-size:13.5px;backdrop-filter:blur(14px);transition:.2s}
+.chip:active{transform:scale(.98);background:var(--glass2)}
+.caps{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 18px}
+.caps span{font-size:11.5px;padding:5px 10px;border-radius:99px;background:rgba(138,180,255,.12);color:#c8d6ff;border:1px solid rgba(138,180,255,.25)}
+#feed{display:flex;flex-direction:column;gap:8px;max-width:760px;margin:0 auto}
+.ev{display:flex;gap:10px;padding:10px 12px;border-radius:16px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);animation:in .35s ease;font-size:13.5px;line-height:1.45;border-left:3px solid var(--c)}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+.ev .em{font-size:16px;line-height:1.3}
+.ev .bd{flex:1;min-width:0;overflow-wrap:anywhere}
+.ev .who{font-size:11px;font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.6px}
+.ev.think .tx{color:#c9cdea;font-style:italic}
+.ev.sys{--c:#666;color:var(--mut);font-size:12.5px}
+.ev.err{--c:var(--err)}
+.ev details{margin-top:6px}
+.ev summary{font-size:12px;color:var(--pri);cursor:pointer}
+.ev pre{white-space:pre-wrap;font-size:11.5px;max-height:240px;overflow:auto;background:rgba(0,0,0,.3);padding:8px;border-radius:10px;margin:6px 0 0}
+.user{align-self:flex-end;max-width:88%;padding:11px 15px;border-radius:20px 20px 6px 20px;background:linear-gradient(135deg,#4f6dff,#8f52ff);font-size:14.5px;animation:in .3s;box-shadow:0 8px 24px rgba(90,80,255,.35)}
+.res{padding:16px 16px 12px;border-radius:var(--r);background:rgba(20,24,48,.72);border:1px solid rgba(138,180,255,.35);backdrop-filter:blur(20px);animation:in .5s;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.res .hd{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px;color:var(--ok);margin-bottom:4px}
+.md{font-size:14.5px;line-height:1.6;overflow-wrap:anywhere}
+.md h2,.md h3,.md h4,.md h5{margin:14px 0 6px;line-height:1.25}
+.md h2{font-size:19px}.md h3{font-size:16.5px}
+.md p{margin:6px 0}.md ul,.md ol{margin:6px 0;padding-left:22px}
+.md a{color:var(--pri)}
+.md code{background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;font-size:.9em}
+.md pre{background:rgba(0,0,0,.4);padding:12px;border-radius:12px;overflow:auto}
+.md pre code{background:none;padding:0}
+.md img{max-width:100%;border-radius:14px;margin:6px 0}
+.md blockquote{margin:6px 0;padding:4px 12px;border-left:3px solid var(--pri);color:#c9cdea}
+.md hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.tw{overflow-x:auto;margin:8px 0}
+.md table{border-collapse:collapse;font-size:13px;min-width:100%}
+.md th,.md td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.md th{background:rgba(255,255,255,.07)}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.acts button,.file{font-size:12.5px;padding:8px 12px;border-radius:99px;background:var(--glass2);border:1px solid var(--line);color:var(--tx);text-decoration:none;display:inline-flex;gap:6px;align-items:center}
+.file{background:rgba(126,240,193,.12);border-color:rgba(126,240,193,.35)}
+.composer{padding:8px 12px calc(env(safe-area-inset-bottom) + 10px);}
+.cbox{max-width:760px;margin:0 auto;display:flex;align-items:flex-end;gap:8px;padding:8px 8px 8px 16px;border-radius:26px;background:rgba(25,28,52,.75);border:1px solid var(--line);backdrop-filter:blur(22px);box-shadow:0 -6px 30px rgba(0,0,0,.25)}
+textarea{flex:1;background:none;border:0;outline:0;color:var(--tx);font:inherit;font-size:15px;resize:none;max-height:140px;padding:9px 0;line-height:1.4}
+textarea::placeholder{color:#7d83a8}
+#go{width:46px;height:46px;border-radius:50%;flex:0 0 auto;background:linear-gradient(135deg,#5b7cff,#a35bff);display:grid;place-items:center;font-size:19px;box-shadow:0 6px 18px rgba(110,90,255,.5);transition:.2s}
+#go.stop{background:var(--err);box-shadow:0 6px 18px rgba(255,90,110,.45)}
+#go:active{transform:scale(.9)}
+.sub{display:flex;justify-content:center;gap:8px;margin-top:6px}
+.sub button{font-size:12px;color:var(--mut);padding:4px 10px;border-radius:99px}
+.sheet{position:fixed;inset:0;z-index:20;display:none}
+.sheet.open{display:block}
+.sheet .bk{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);animation:fade .25s}
+@keyframes fade{from{opacity:0}}
+.sheet .pn{position:absolute;left:0;right:0;bottom:0;max-height:88%;overflow:auto;background:rgba(22,25,46,.94);border-top-left-radius:28px;border-top-right-radius:28px;border:1px solid var(--line);padding:10px 18px calc(env(safe-area-inset-bottom) + 20px);animation:up .35s cubic-bezier(.2,.9,.3,1);max-width:760px;margin:0 auto;backdrop-filter:blur(24px)}
+@keyframes up{from{transform:translateY(100%)}}
+.grab{width:42px;height:5px;border-radius:9px;background:#555b80;margin:2px auto 12px}
+.pn h3{margin:4px 0 4px;font-size:20px}
+.pn .hint{color:var(--mut);font-size:12.5px;margin:0 0 12px;line-height:1.45}
+.fld{margin:12px 0}
+.fld label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:5px;font-weight:600}
+.fld input,.fld select{width:100%;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--tx);font:inherit;font-size:14px;outline:0}
+.fld input:focus,.fld select:focus{border-color:var(--pri)}
+.fld small{display:block;color:#7d83a8;font-size:11.5px;margin-top:4px}
+.fld small a{color:var(--pri)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.prim{width:100%;padding:14px;border-radius:16px;background:linear-gradient(135deg,#5b7cff,#a35bff);font-weight:700;margin-top:10px}
+.hi{padding:12px 14px;border-radius:16px;background:var(--glass);border:1px solid var(--line);margin:8px 0;cursor:pointer}
+.hi b{display:block;font-size:14px;margin-bottom:3px}
+.hi span{font-size:11.5px;color:var(--mut)}
+.toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(30,34,64,.95);border:1px solid var(--line);padding:10px 16px;border-radius:99px;font-size:13px;z-index:30;animation:in .3s}
+#office{position:relative;height:38vh;min-height:210px;margin:2px 12px 8px;border-radius:24px;overflow:hidden;border:1px solid var(--line);display:none;transition:height .45s cubic-bezier(.2,.9,.3,1);box-shadow:0 10px 40px rgba(0,0,0,.4);background:#141726}
+body.has3d #office{display:block}body.has3d .team{display:none}
+#office.big{height:66vh}
+#gl{position:absolute;inset:0;width:100%;height:100%;touch-action:none;image-rendering:auto;filter:saturate(1.12) contrast(1.05)}
+#office::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.09) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55));z-index:2}
+.tag{position:absolute;left:0;top:0;z-index:3;pointer-events:auto;cursor:pointer;padding:4px 8px 5px;border-radius:10px;background:rgba(10,12,28,.72);border:1px solid rgba(255,255,255,.15);text-align:center;white-space:nowrap;backdrop-filter:blur(6px);font-size:10px;line-height:1.25;transition:border-color .3s,background .3s}
+.tag b{display:block;font-size:10.5px}.tag span{display:block;color:var(--mut);font-size:9.5px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.tag.on{border-color:var(--c);background:rgba(20,24,52,.9);box-shadow:0 0 14px var(--c)}.tag.on span{color:#fff}
+.tag.done span{color:var(--ok)}
+.tag::after{content:"";position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:rgba(10,12,28,.72)}
+#bBig{position:absolute;right:10px;bottom:10px;z-index:4;width:34px;height:34px;border-radius:11px;background:rgba(10,12,28,.6);border:1px solid var(--line);font-size:15px;backdrop-filter:blur(8px)}
+.offlbl{position:absolute;left:12px;bottom:12px;z-index:4;font:700 10px/1 monospace;letter-spacing:1px;color:#8ab4ff;opacity:.75;pointer-events:none}
+body.has3d #hero{padding-top:12px}body.has3d #hero h2{font-size:22px}body.has3d .caps{display:none}
+h4.sec{margin:20px 0 4px;font-size:13px;color:var(--pri);text-transform:uppercase;letter-spacing:.8px}
+</style>
+</head>
+<body>
+<div class="aurora"><i></i><i></i><i></i></div>
+
+<header>
+  <div class="logo">🛰️</div>
+  <div><h1>Agentkåren</h1><small>Ditt AI-team som gör vad du ber om</small></div>
+  <div class="sp"></div>
+  <span id="prov">⚡ –</span>
+  <button class="hbtn" id="bHist" title="Historik">🕘</button>
+  <button class="hbtn" id="bSet" title="Inställningar">⚙️</button>
+</header>
+
+<section class="team" id="team"></section>
+<div id="office"><canvas id="gl"></canvas><button id="bBig" title="Förstora">⛶</button><div class="offlbl">● LIVE · KONTORET</div></div>
+
+<main id="main">
+  <div id="hero">
+    <h2>Vad ska teamet göra?</h2>
+    <p>Beskriv uppdraget. Chefen delar upp det, delegerar till specialister – och anställer nya agenter vid behov.</p>
+    <div class="caps"><span>🔎 Webbsök</span><span>🕷️ Skrapning</span><span>📄 Läs sidor</span><span>🧮 Kör kod</span><span>🔌 API:er</span><span>🎨 Bilder</span><span>💾 Filer</span><span>👥 Parallellt</span></div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div id="feed"></div>
+</main>
+
+<footer class="composer">
+  <div class="cbox">
+    <textarea id="inp" rows="1" placeholder="Ge teamet ett uppdrag…"></textarea>
+    <button id="go" title="Skicka">➤</button>
+  </div>
+  <div class="sub"><button id="bNew">＋ Nytt uppdrag</button></div>
+</footer>
+
+<div class="sheet" id="sheet"><div class="bk"></div><div class="pn" id="pn"></div></div>
+
+<script>
+'use strict';
+/* ========== Hjälpare ========== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const trunc=(s,n)=>{s=String(s??'');return s.length>n?s.slice(0,n)+`\n…[avkortat, ${s.length-n} tecken till]`:s};
+const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
+function sleep(ms){return new Promise((res,rej)=>{const t=setTimeout(res,ms);RUN.ctrl?.signal.addEventListener('abort',()=>{clearTimeout(t);rej(new DOMException('Stoppad','AbortError'))},{once:true})})}
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2200)}
+const isAbort=e=>e?.name==='AbortError'&&RUN.ctrl?.signal.aborted;
+function checkAbort(){if(RUN.ctrl?.signal.aborted)throw new DOMException('Stoppad','AbortError')}
+function anySignal(a){if(AbortSignal.any)return AbortSignal.any(a);const c=new AbortController();a.forEach(s=>s.addEventListener('abort',()=>c.abort(),{once:true}));return c.signal}
+let NOSIG=false; // vissa förhandsvisningar (t.ex. Claude-appen) proxar fetch via postMessage och kan inte klona AbortSignal
+async function tfetch(url,opt={},ms=20000){
+  const c=new AbortController();let t;
+  const sig=RUN.ctrl?anySignal([c.signal,RUN.ctrl.signal]):c.signal;
+  const guard=new Promise((_,rej)=>{t=setTimeout(()=>{c.abort();rej(new DOMException('Timeout','AbortError'))},ms);sig.addEventListener('abort',()=>rej(new DOMException('Stoppad','AbortError')),{once:true})});
+  guard.catch(()=>{});
+  try{
+    if(!NOSIG){try{return await Promise.race([fetch(url,{...opt,signal:sig}),guard])}catch(e){if(/clone|postMessage/i.test(e?.message||''))NOSIG=true;else throw e}}
+    return await Promise.race([fetch(url,opt),guard]);
+  }finally{clearTimeout(t)}
+}
+
+/* ========== Inställningar ========== */
+const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',custom:''},
+  models:{gemini:'gemini-2.5-flash',groq:'llama-3.3-70b-versatile',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
+  customUrl:'',proxy:'',maxSteps:20,subSteps:12};
+let S;try{const o=JSON.parse(localStorage.ak_set||'{}');S={...DEF,...o,keys:{...DEF.keys,...o.keys},models:{...DEF.models,...o.models}}}catch{S=structuredClone(DEF)}
+const saveS=()=>localStorage.ak_set=JSON.stringify(S);
+
+const PROV={
+  gemini:{name:'Gemini',url:()=>'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',link:'https://aistudio.google.com/apikey'},
+  groq:{name:'Groq',url:()=>'https://api.groq.com/openai/v1/chat/completions',link:'https://console.groq.com/keys'},
+  openrouter:{name:'OpenRouter',url:()=>'https://openrouter.ai/api/v1/chat/completions',link:'https://openrouter.ai/keys'},
+  pollinations:{name:'Pollinations',url:()=>'https://text.pollinations.ai/openai',nokey:true},
+  custom:{name:'Egen',url:()=>S.customUrl}
+};
+function provOrder(){
+  if(S.provider!=='auto')return S.provider==='pollinations'?['pollinations']:[S.provider,'pollinations'];
+  const o=['gemini','groq','openrouter','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));
+  o.push('pollinations');return o;
+}
+function setProvBadge(p){$('#prov').textContent='⚡ '+(p?PROV[p].name:provOrder().map(x=>PROV[x].name)[0])}
+
+/* ========== LLM ========== */
+let CALLS=0;
+async function callProvider(p,messages){
+  const P=PROV[p];
+  for(let a=0;a<4;a++){
+    checkAbort();
+    const body={model:S.models[p]||undefined,messages,temperature:.4};
+    if(p==='pollinations')body.referrer='agentkaren';
+    const r=await tfetch(P.url(),{method:'POST',headers:{'Content-Type':'application/json',...(S.keys[p]&&!P.nokey?{Authorization:'Bearer '+S.keys[p]}:{})},body:JSON.stringify(body)},90000);
+    if(r.status===429||r.status===503||r.status===502){
+      const w=(+r.headers.get('retry-after')||0)*1000||7000*(a+1);
+      sys(`${P.name}: kvot/överbelastning – väntar ${Math.round(w/1000)} s…`);await sleep(Math.min(w,45000));continue;
+    }
+    if(!r.ok)throw new Error(`${P.name} ${r.status}: ${(await r.text()).slice(0,200)}`);
+    const j=await r.json();let c=j.choices?.[0]?.message?.content;
+    if(Array.isArray(c))c=c.map(x=>x.text||'').join('');
+    if(!c)throw new Error(P.name+': tomt svar');
+    CALLS++;setProvBadge(p);return c;
+  }
+  throw new Error(P.name+': för många försök');
+}
+async function llm(messages){
+  let last;
+  for(const p of provOrder()){
+    try{return await callProvider(p,messages)}catch(e){if(isAbort(e))throw e;last=e;sys('⚠️ '+e.message+' – provar nästa leverantör')}
+  }
+  throw last||new Error('Ingen AI-leverantör tillgänglig');
+}
+
+/* ========== Webb / skrapning ========== */
+const PROXIES=[
+  u=>u,
+  u=>S.proxy?S.proxy.replace('{url}',encodeURIComponent(u)):null,
+  u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+  u=>'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u),
+  u=>'https://corsproxy.io/?url='+encodeURIComponent(u),
+];
+function normUrl(u){u=String(u||'').trim();if(!u)throw new Error('url saknas');if(!/^https?:\/\//i.test(u))u='https://'+u;return u}
+async function fetchRaw(url){
+  url=normUrl(url);const errs=[];
+  for(const f of PROXIES){
+    const pu=f(url);if(!pu)continue;
+    try{
+      const r=await tfetch(pu,{},pu===url?8000:20000);
+      if(!r.ok){errs.push(r.status);continue}
+      const t=await r.text();if(t.length<30){errs.push('tomt');continue}
+      return t;
+    }catch(e){if(isAbort(e))throw e;errs.push(e.name==='AbortError'?'timeout':'blockerad')}
+  }
+  try{const r=await tfetch('https://r.jina.ai/'+url,{headers:{'X-Return-Format':'html'}},35000);if(r.ok)return await r.text()}catch(e){if(isAbort(e))throw e}
+  throw new Error(`Kunde inte hämta ${url} (${errs.join(', ')})`);
+}
+const parseDoc=html=>new DOMParser().parseFromString(html,'text/html');
+const abs=(h,base)=>{try{return new URL(h,base).href}catch{return h}};
+function htmlToText(html){
+  html=html.replace(/<(script|style|noscript|svg|iframe|template)[\s\S]*?<\/\1>/gi,'')
+    .replace(/<(\/?)(p|div|br|li|h[1-6]|tr|section|article|header|footer|ul|ol|table|blockquote|pre)\b/gi,'\n<$1$2');
+  const d=parseDoc(html);const title=d.title||'';
+  const t=(d.body?.textContent||'').replace(/[ \t\u00a0]+/g,' ').replace(/\n\s*\n+/g,'\n\n').trim();
+  return (title?`TITEL: ${title}\n\n`:'')+t;
+}
+async function readPage({url}){
+  url=normUrl(url);
+  try{const r=await tfetch('https://r.jina.ai/'+url,{},35000);if(r.ok){const t=await r.text();if(t.length>150)return trunc(t,14000)}}catch(e){if(isAbort(e))throw e}
+  return trunc(htmlToText(await fetchRaw(url)),14000);
+}
+async function scrape({url,selector,attr='text',limit=60}){
+  if(!selector)throw new Error('selector saknas');
+  url=normUrl(url);const d=parseDoc(await fetchRaw(url));
+  let els;try{els=[...d.querySelectorAll(selector)]}catch{throw new Error('Ogiltig CSS-selektor: '+selector)}
+  if(!els.length){
+    const cnt={};d.querySelectorAll('[class]').forEach(e=>e.classList.forEach(c=>cnt[c]=(cnt[c]||0)+1));
+    const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,40).map(([c,n])=>`.${c}(${n})`).join(' ');
+    return `0 träffar för "${selector}". Sidan kan vara JS-renderad – testa read_page. Vanliga klasser: ${top}`;
+  }
+  const sel=els.slice(0,Math.min(+limit||60,200));
+  const out=sel.map(el=>{
+    if(attr==='text')return clean(el.textContent);
+    if(attr==='html')return el.outerHTML.slice(0,700);
+    const v=el.getAttribute(attr);return (attr==='href'||attr==='src')&&v?abs(v,url):v;
+  }).filter(x=>x!=null&&x!=='');
+  return {url,selector,traffar:els.length,data:out};
+}
+async function links({url,filter=''}){
+  url=normUrl(url);const d=parseDoc(await fetchRaw(url));const f=String(filter).toLowerCase();const seen=new Set();const out=[];
+  d.querySelectorAll('a[href]').forEach(a=>{
+    const h=abs(a.getAttribute('href'),url);if(!/^https?:/.test(h)||seen.has(h))return;
+    const t=clean(a.textContent).slice(0,90);if(f&&!(t.toLowerCase().includes(f)||h.toLowerCase().includes(f)))return;
+    seen.add(h);out.push(`${t||'(ingen text)'} → ${h}`);
+  });
+  return `${out.length} länkar:\n`+out.slice(0,120).join('\n');
+}
+async function fetchJson({url}){
+  const t=await fetchRaw(url);try{return trunc(JSON.stringify(JSON.parse(t),null,1),12000)}catch{return trunc(t,12000)}
+}
+async function search({query,n=8}){
+  if(!query)throw new Error('query saknas');const q=encodeURIComponent(query);
+  const ddg=href=>{try{const u=new URL(href,'https://duckduckgo.com');return u.searchParams.get('uddg')||u.href}catch{return href}};
+  try{
+    const d=parseDoc(await fetchRaw('https://html.duckduckgo.com/html/?q='+q));
+    const res=[...d.querySelectorAll('.result:not(.result--ad)')].map(r=>{const a=r.querySelector('.result__a');return a&&{titel:clean(a.textContent),url:ddg(a.getAttribute('href')),utdrag:clean(r.querySelector('.result__snippet')?.textContent)}}).filter(x=>x&&x.url).slice(0,n);
+    if(res.length)return res;
+  }catch(e){if(isAbort(e))throw e}
+  try{
+    const d=parseDoc(await fetchRaw('https://lite.duckduckgo.com/lite/?q='+q));
+    const res=[...d.querySelectorAll('a.result-link')].map(a=>({titel:clean(a.textContent),url:ddg(a.getAttribute('href'))})).slice(0,n);
+    if(res.length)return res;
+  }catch(e){if(isAbort(e))throw e}
+  try{const r=await tfetch('https://r.jina.ai/https://www.bing.com/search?q='+q,{},35000);if(r.ok){const t=await r.text();if(t.length>300)return 'Sökresultat (Bing, råtext):\n'+trunc(t,7000)}}catch(e){if(isAbort(e))throw e}
+  const r=await tfetch(`https://sv.wikipedia.org/w/api.php?action=query&list=search&srsearch=${q}&format=json&origin=*&srlimit=${n}`);
+  const j=await r.json();return (j.query?.search||[]).map(s=>({titel:s.title,url:'https://sv.wikipedia.org/wiki/'+encodeURIComponent(s.title.replace(/ /g,'_')),utdrag:clean(s.snippet.replace(/<[^>]+>/g,''))}));
+}
+
+/* ========== Kod / filer / bild / anteckningar ========== */
+function runJs({code,input=null}){
+  return new Promise((res)=>{
+    const src=`const __l=[];const console={log:(...a)=>__l.push(a.map(x=>typeof x==='object'?JSON.stringify(x):String(x)).join(' ')),error:(...a)=>__l.push('ERR '+a.join(' ')),warn:(...a)=>__l.push(a.join(' '))};
+onmessage=async e=>{try{const F=Object.getPrototypeOf(async function(){}).constructor;const r=await new F('input',e.data.code)(e.data.input);let v=r;try{v=JSON.parse(JSON.stringify(r??null))}catch{v=String(r)}postMessage({ok:true,v,l:__l})}catch(err){postMessage({ok:false,e:String(err&&err.stack||err),l:__l})}}`;
+    const url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));const w=new Worker(url);
+    const done=o=>{w.terminate();URL.revokeObjectURL(url);clearTimeout(t);res(o)};
+    const t=setTimeout(()=>done('FEL: timeout efter 20 s'),20000);
+    RUN.ctrl?.signal.addEventListener('abort',()=>done('Stoppad'),{once:true});
+    w.onmessage=e=>{const m=e.data;done((m.l.length?'console:\n'+m.l.join('\n')+'\n\n':'')+(m.ok?'return: '+(typeof m.v==='string'?m.v:JSON.stringify(m.v,null,1)):'FEL: '+m.e))};
+    w.onerror=e=>{e.preventDefault();done('FEL: '+e.message)};
+    w.postMessage({code:String(code||''),input});
+  });
+}
+let FILES=[],NOTES=[];
+function saveFile({name='fil.txt',content=''}){
+  if(typeof content!=='string')content=JSON.stringify(content,null,2);
+  FILES=FILES.filter(f=>f.name!==name);FILES.push({name,content});
+  return `Sparad: ${name} (${content.length} tecken). Användaren kan ladda ner den.`;
+}
+function image({prompt,width=1024,height=768}){
+  const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&nologo=true&seed=${Math.floor(Math.random()*1e6)}`;
+  return `Bild skapad. Inkludera i slutsvaret som markdown: ![${clean(prompt).slice(0,60)}](${url})`;
+}
+function note({text}){NOTES.push(clean(text));window.OFFICE?.notes(NOTES);return 'Anteckning delad med teamet.'}
+
+/* ========== Agenter ========== */
+const BASE_TOOLS=['search','read_page','scrape','links','fetch_json','run_js','save_file','image','note'];
+const AG={
+  chef:{name:'Chef',emoji:'🧭',c:'#8ab4ff',role:'Du är Chef och leder ett team av AI-agenter. Du kan lösa ALLA typer av uppdrag. Planera, dela upp i deluppdrag, delegera till rätt specialist (gärna parallellt), granska rapporterna och leverera ett komplett, välformaterat slutsvar. Enkla saker löser du själv direkt. Saknas en specialist anställer du en ny genom delegate med nytt agentnamn och role.',tools:[...BASE_TOOLS,'delegate','delegate_parallel']},
+  forskare:{name:'Forskare',emoji:'🔎',c:'#7ef0c1',role:'Du är Forskare. Du söker på webben, läser flera källor, korskontrollerar fakta och rapporterar koncist med käll-URL:er.',tools:['search','read_page','links','fetch_json','note']},
+  skrapare:{name:'Skrapare',emoji:'🕷️',c:'#ffb86b',role:'Du är Skrapare. Du extraherar strukturerad data från webbsidor. Strategi: läs sidan eller använd scrape med html-attr för att hitta struktur, välj precisa CSS-selektorer, extrahera, städa med run_js, spara som CSV/JSON med save_file. Hitta och använd gärna öppna API:er/RSS.',tools:['search','read_page','scrape','links','fetch_json','run_js','save_file','note']},
+  analytiker:{name:'Analytiker',emoji:'🧮',c:'#c49bff',role:'Du är Analytiker. Du räknar, jämför, bearbetar och sammanfattar data med JavaScript (run_js) och hämtar data från API:er. Visa siffror i tabeller.',tools:['run_js','fetch_json','read_page','save_file','note']},
+  skribent:{name:'Skribent',emoji:'✍️',c:'#ff8fb1',role:'Du är Skribent. Du skriver texter, kod, planer, mejl och manus av hög kvalitet, skapar bilder vid behov och sparar längre leveranser som filer.',tools:['save_file','image','run_js','note']},
+};
+const CORE=Object.keys(AG);window.AG=AG;
+const PALETTE=['#5ee7ff','#ffd36e','#9dff7a','#ff9e6e','#b4a7ff','#ff7ad9'];
+function hire(id,name,role){
+  AG[id]={name,emoji:'🤖',c:PALETTE[Object.keys(AG).length%PALETTE.length],role:`Du är ${name}, en nyanställd specialist. ${role}`,tools:[...BASE_TOOLS],hired:true};
+  renderTeam(id);window.OFFICE?.sync(AG);emit(id,'sys2','👋 Anställd: '+role);
+}
+const TOOLDOC={
+  search:['Söker','🔎','{"query":"sökfras","n":8} – webbsökning, ger titel/url/utdrag'],
+  read_page:['Läser','📄','{"url":"..."} – hämtar en sida som ren text/markdown (fungerar även för JS-sidor)'],
+  scrape:['Skrapar','🕷️','{"url":"...","selector":"css-selektor","attr":"text|href|src|html|<attribut>","limit":60} – extraherar element'],
+  links:['Kartlägger länkar','🔗','{"url":"...","filter":"valfri text"} – listar länkar på en sida'],
+  fetch_json:['Hämtar data','🔌','{"url":"..."} – hämtar JSON/API/RSS/rå text'],
+  run_js:['Kör kod','🧮','{"code":"js-kropp med return","input":valfri data} – kör async JavaScript i sandlåda; fetch finns; console.log fångas'],
+  save_file:['Sparar fil','💾','{"name":"data.csv","content":"..."} – skapar nedladdningsbar fil'],
+  image:['Skapar bild','🎨','{"prompt":"detaljerad beskrivning på engelska"} – genererar bild'],
+  note:['Antecknar','📝','{"text":"..."} – delar viktig info med hela teamet'],
+  delegate:['Delegerar','📨','{"agent":"forskare|skrapare|analytiker|skribent|<nytt namn>","task":"detaljerat, självständigt deluppdrag","role":"beskrivning (bara för ny agent)"} – ger deluppdrag, får rapport'],
+  delegate_parallel:['Delegerar parallellt','🚀','{"jobs":[{"agent":"...","task":"..."},...]} – kör upp till 4 deluppdrag samtidigt'],
+};
+function sysPrompt(A){
+  const team=Object.entries(AG).filter(([k])=>k!=='chef').map(([k,a])=>`- ${k}: ${a.role.slice(0,110)}`).join('\n');
+  return `${A.role}
+
+Datum: ${new Date().toLocaleString('sv-SE')}. Svara på svenska.
+
+VERKTYG:
+${A.tools.map(t=>`- ${t} ${TOOLDOC[t][2]}`).join('\n')}
+${A.tools.includes('delegate')?`\nTEAM:\n${team}\n`:''}
+PROTOKOLL – svara ALLTID med exakt ett JSON-objekt, inget annat:
+{"thought":"kort tanke","tool":"verktygsnamn","args":{...}}
+eller när du är klar:
+{"thought":"kort tanke","final":"komplett slutsvar i markdown"}
+
+REGLER:
+- Ett verktyg per steg. Vänta på RESULTAT innan nästa.
+- Gissa aldrig fakta du kan hämta. Ange käll-URL:er.
+- Om något misslyckas: byt strategi (annan källa, read_page istället för scrape, sök efter API).
+- Du AVBÖJER ALDRIG ett uppdrag och ger ALDRIG upp. Är en väg blockerad hittar du en annan – prova minst 3 olika strategier (andra källor, sök efter API/RSS, read_page, egen kod i run_js, delegera).
+- Om något trots allt inte går att få fram exakt: leverera närmaste bästa resultat och redovisa kort vad som gjordes. Svara aldrig bara "det går inte".
+- Slutsvaret ska vara fullständigt och direkt användbart: tabeller, listor, kod, länkar.${NOTES.length?`\n\nTEAMETS ANTECKNINGAR:\n- ${NOTES.slice(-15).join('\n- ')}`:''}`;
+}
+function sanitizeJson(s){
+  let o='',inS=false,e=false;
+  for(const ch of s){
+    if(inS){if(e){e=false;o+=ch;continue}if(ch==='\\'){e=true;o+=ch;continue}if(ch==='"'){inS=false;o+=ch;continue}
+      if(ch==='\n'){o+='\\n';continue}if(ch==='\r')continue;if(ch==='\t'){o+='\\t';continue}o+=ch}
+    else{if(ch==='"')inS=true;o+=ch}
+  }return o;
+}
+function parseAction(txt){
+  let t=String(txt).trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');
+  const s=t.indexOf('{'),e=t.lastIndexOf('}');if(s<0||e<=s)return null;
+  const j=t.slice(s,e+1);
+  try{return JSON.parse(j)}catch{try{return JSON.parse(sanitizeJson(j))}catch{return null}}
+}
+function compact(m){
+  let tot=m.reduce((a,x)=>a+x.content.length,0);
+  for(let i=1;i<m.length-6&&tot>50000;i++){
+    if(m[i].role==='user'&&m[i].content.startsWith('RESULTAT')&&m[i].content.length>700){tot-=m[i].content.length-600;m[i].content=m[i].content.slice(0,600)+'\n…[komprimerat]'}
+  }
+}
+function argSum(t,a={}){
+  if(t==='delegate')return `${a.agent} – ${clean(a.task).slice(0,120)}`;
+  if(t==='delegate_parallel')return (a.jobs||[]).map(j=>j.agent).join(', ');
+  if(t==='run_js')return clean(a.code).slice(0,90);
+  if(t==='save_file')return a.name;
+  return a.query||a.url||a.prompt||clean(a.text).slice(0,90)||'';
+}
+async function runAgent(id,task,depth,msgs){
+  const A=AG[id];const max=depth?S.subSteps:S.maxSteps;
+  const m=msgs||[{role:'system',content:''}];m.push({role:'user',content:task});
+  let fails=0,push=0;
+  for(let step=0;step<max;step++){
+    checkAbort();m[0].content=sysPrompt(A);compact(m);
+    status(id,'Tänker…',1);
+    const raw=await llm(m);m.push({role:'assistant',content:raw});
+    const act=parseAction(raw);
+    if(!act||(!act.tool&&act.final==null)){
+      if(++fails>=2&&raw.trim()&&!act){status(id,'Klar',0,1);return raw.trim()}
+      m.push({role:'user',content:'Fel format. Svara ENDAST med ett giltigt JSON-objekt enligt PROTOKOLL.'});continue;
+    }
+    fails=0;
+    if(act.thought){emit(id,'think',act.thought);window.OFFICE?.log(id,'💭 '+act.thought)}
+    if(act.final!=null&&!act.tool){
+      const fin=typeof act.final==='string'?act.final:JSON.stringify(act.final,null,2);
+      if(GIVEUP.test(fin.slice(0,700))&&push<2&&step<max-2){push++;
+        emit(depth?'chef':id,'hand',depth?`💪 → <b>${esc(A.name)}</b>: Ge inte upp – hitta en annan väg!`:'💪 Ger inte upp – testar en ny strategi',null,true);
+        window.OFFICE?.log(depth?'chef':id,'💪 Ge inte upp!');
+        m.push({role:'user',content:'Avböj inte och ge inte upp. Det finns nästan alltid en annan väg: andra källor, sök efter ett öppet API eller RSS, read_page, skriv egen kod med run_js'+(A.tools.includes('delegate')?', delegera till en specialist eller anställ en ny':'')+'. Prova en helt ny strategi nu och leverera bästa möjliga resultat.'});continue}
+      status(id,'Klar',0,1);return fin}
+    const tn=act.tool;
+    if(!TOOLDOC[tn]||!A.tools.includes(tn)){m.push({role:'user',content:`Verktyget "${tn}" finns inte för dig. Tillåtna: ${A.tools.join(', ')}`});continue}
+    const [lab,ico]=TOOLDOC[tn];status(id,lab+'…',1);window.OFFICE?.log(id,`${ico} ${lab}: ${argSum(tn,act.args)}`);
+    const ev=tn.startsWith('delegate')?null:emit(id,'tool',`<b>${ico} ${lab}</b> ${esc(argSum(tn,act.args))}`,null,true);
+    let out;
+    try{out=await TOOLS[tn](act.args||{},{agent:id,depth})}catch(e){if(isAbort(e))throw e;out='FEL: '+e.message}
+    const s=typeof out==='string'?out:JSON.stringify(out,null,1);
+    if(ev)detail(ev,s);window.OFFICE?.log(id,(s.startsWith('FEL')?'✗ ':'✓ ')+s.slice(0,60));
+    m.push({role:'user',content:`RESULTAT (${tn}):\n${trunc(s,7000)}\n\n[Steg ${step+1}/${max}]${step>=max-2?' Snart slut på steg – avsluta med final.':''}`});
+  }
+  m.push({role:'user',content:'Stegen är slut. Ge slutsvaret NU som {"final":"..."} med allt du hittat.'});
+  const raw=await llm(m);m.push({role:'assistant',content:raw});const a=parseAction(raw);status(id,'Klar',0,1);
+  return a?.final??raw;
+}
+const GIVEUP=/(kan (tyvärr )?inte|kunde (tyvärr )?inte|går (tyvärr )?inte|omöjligt|inte möjligt|har (inte|ingen) (möjlighet|tillgång)|saknar (möjlighet|tillgång)|I can(no|')t|unable to|I'm sorry|I am sorry)/i;
+const slug=s=>String(s||'agent').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'agent';
+async function delegate({agent,task,role},ctx){
+  if(ctx.depth>=1)return 'FEL: endast Chef kan delegera.';
+  if(!task)return 'FEL: task saknas.';
+  const id=slug(agent);
+  if(!AG[id])hire(id,String(agent).replace(/^./,c=>c.toUpperCase()),role||('Specialist på '+agent+'.'));
+  window.OFFICE?.handoff(ctx.agent,id);window.OFFICE?.log(ctx.agent,'📨 → '+AG[id].name);
+  emit(ctx.agent,'hand',`📨 → <b>${esc(AG[id].name)}</b>: ${esc(clean(task).slice(0,220))}`,null,true);
+  const r=await runAgent(id,task,ctx.depth+1);
+  const ev=emit(id,'done',`✅ Rapport till Chef`,null,true);detail(ev,r);
+  return `RAPPORT från ${AG[id].name}:\n${r}`;
+}
+async function delegateParallel({jobs=[]},ctx){
+  const js=jobs.slice(0,4);if(!js.length)return 'FEL: jobs saknas.';
+  const rs=await Promise.all(js.map(j=>delegate(j,ctx).catch(e=>{if(isAbort(e))throw e;return `FEL från ${j.agent}: ${e.message}`})));
+  return rs.join('\n\n---\n\n');
+}
+const TOOLS={search,read_page:readPage,scrape,links,fetch_json:fetchJson,run_js:runJs,save_file:saveFile,image,note,delegate,delegate_parallel:delegateParallel};
+
+/* ========== UI ========== */
+const feed=$('#feed'),main=$('#main'),inp=$('#inp'),go=$('#go');
+let RUN={busy:false,ctrl:null},CONV=null,CUR=null;
+function renderTeam(fresh){
+  $('#team').innerHTML=Object.entries(AG).map(([k,a])=>`<div class="ag${k===fresh?' new':''}" id="ag-${k}" style="--c:${a.c}"><div class="orb">${a.emoji}</div><b>${esc(a.name)}</b><span>Vilar</span></div>`).join('');
+}
+function status(id,txt,on,done){
+  const el=document.getElementById('ag-'+id);if(!el)return;
+  window.OFFICE?.status(id,txt,on,done);
+  el.classList.toggle('on',!!on);el.classList.toggle('done',!!done);el.querySelector('span').textContent=txt;
+  if(on)el.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+}
+function resetTeam(){Object.keys(AG).forEach(k=>status(k,'Vilar',0,0))}
+function scrollEnd(){requestAnimationFrame(()=>main.scrollTop=main.scrollHeight)}
+function emit(id,type,text,_,html){
+  const a=AG[id]||{name:'System',emoji:'⚙️',c:'#666'};
+  const d=document.createElement('div');d.className='ev '+type;d.style.setProperty('--c',a.c);
+  d.innerHTML=`<div class="em">${a.emoji}</div><div class="bd"><div class="who">${esc(a.name)}</div><div class="tx">${html?text:esc(text)}</div></div>`;
+  feed.append(d);scrollEnd();return d;
+}
+function sys(t){const d=document.createElement('div');d.className='ev sys';d.style.setProperty('--c','#555');d.innerHTML=`<div class="bd">${esc(t)}</div>`;feed.append(d);scrollEnd()}
+function detail(ev,s){const det=document.createElement('details');det.innerHTML=`<summary>Visa resultat (${s.length} tecken)</summary><pre>${esc(trunc(s,8000))}</pre>`;ev.querySelector('.bd').append(det)}
+
+function md(src){
+  const blocks=[];
+  src=String(src??'').replace(/```[\w-]*\n?([\s\S]*?)```/g,(m,c)=>{blocks.push(`<pre><code>${esc(c.replace(/\n$/,''))}</code></pre>`);return `\u0000${blocks.length-1}\u0000`});
+  const inl=s=>s.replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g,'<img alt="$1" src="$2" loading="lazy">')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]+)\*/g,'$1<i>$2</i>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  const tbl=rows=>{
+    const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>inl(c.trim()));
+    const body=rows.filter(r=>!/^\s*\|?\s*:?-{2,}/.test(r));if(!body.length)return '';
+    const [h,...rest]=body;
+    return `<div class="tw"><table><thead><tr>${cells(h).map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rest.map(r=>`<tr>${cells(r).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  };
+  let h='',list=null,tb=[];
+  const fl=()=>{if(list){h+=`</${list}>`;list=null}if(tb.length){h+=tbl(tb);tb=[]}};
+  for(const ln of esc(src).split('\n')){
+    let x;
+    if(/^\s*\|.*\|\s*$/.test(ln)){if(list){h+=`</${list}>`;list=null}tb.push(ln);continue}
+    if(tb.length){h+=tbl(tb);tb=[]}
+    if(/^\s*\u0000\d+\u0000\s*$/.test(ln)){fl();h+=ln.trim();continue}
+    if(x=ln.match(/^(#{1,4})\s+(.*)/)){fl();const n=x[1].length+1;h+=`<h${n}>${inl(x[2])}</h${n}>`;continue}
+    if(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(ln)){fl();h+='<hr>';continue}
+    if(x=ln.match(/^\s*[-*•]\s+(.*)/)){if(list!=='ul'){fl();h+='<ul>';list='ul'}h+=`<li>${inl(x[1])}</li>`;continue}
+    if(x=ln.match(/^\s*\d+[.)]\s+(.*)/)){if(list!=='ol'){fl();h+='<ol>';list='ol'}h+=`<li>${inl(x[1])}</li>`;continue}
+    if(x=ln.match(/^&gt;\s?(.*)/)){fl();h+=`<blockquote>${inl(x[1])}</blockquote>`;continue}
+    if(!ln.trim()){fl();continue}
+    fl();h+=`<p>${inl(ln)}</p>`;
+  }
+  fl();
+  return h.replace(/\u0000(\d+)\u0000/g,(m,i)=>blocks[+i]||'');
+}
+function dl(name,content){
+  const mime=/\.json$/i.test(name)?'application/json':/\.csv$/i.test(name)?'text/csv':/\.html?$/i.test(name)?'text/html':'text/plain';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:mime+';charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function showResult(text,files){
+  const d=document.createElement('div');d.className='res';
+  d.innerHTML=`<div class="hd">✨ Uppdrag slutfört</div><div class="md">${md(text)}</div><div class="acts"></div>`;
+  const acts=d.querySelector('.acts');
+  (files||[]).forEach(f=>{const b=document.createElement('button');b.className='file';b.textContent='⬇️ '+f.name;b.onclick=()=>dl(f.name,f.content);acts.append(b)});
+  const c=document.createElement('button');c.textContent='📋 Kopiera';c.onclick=()=>navigator.clipboard.writeText(text).then(()=>toast('Kopierat'));
+  const m=document.createElement('button');m.textContent='📝 Spara .md';m.onclick=()=>dl('agentkaren-resultat.md',text);
+  const s=document.createElement('button');s.textContent='↗️ Dela';s.onclick=()=>navigator.share?navigator.share({text}).catch(()=>{}):navigator.clipboard.writeText(text).then(()=>toast('Kopierat'));
+  acts.append(c,m,s);feed.append(d);scrollEnd();
+}
+function userBubble(t){const d=document.createElement('div');d.className='user';d.textContent=t;feed.append(d);scrollEnd()}
+
+async function start(){
+  const task=inp.value.trim();if(!task||RUN.busy)return;
+  inp.value='';autosize();$('#hero').style.display='none';
+  RUN={busy:true,ctrl:new AbortController()};go.classList.add('stop');go.textContent='■';
+  userBubble(task);resetTeam();
+  const fresh=!CONV;if(fresh){CONV=[{role:'system',content:''}];FILES=[];NOTES=[];CUR={id:Date.now(),task,turns:[]};window.OFFICE?.task(task)}
+  const before=FILES.length;
+  try{
+    const final=await runAgent('chef',fresh?task:`Uppföljning från användaren: ${task}`,0,CONV);
+    showResult(final,FILES);
+    CUR.turns.push({q:task,a:final});CUR.files=FILES;saveHist(CUR);
+  }catch(e){
+    if(isAbort(e)||RUN.ctrl.signal.aborted)sys('⏹ Uppdraget stoppades.');
+    else{const ev=emit('chef','err','Något gick fel: '+e.message);ev.querySelector('.who').textContent='Fel'}
+  }finally{
+    RUN.busy=false;go.classList.remove('stop');go.textContent='➤';
+    Object.keys(AG).forEach(k=>{const el=document.getElementById('ag-'+k);if(el)el.classList.remove('on');if(el&&!el.classList.contains('done'))el.querySelector('span').textContent='Vilar'});
+    inp.placeholder='Följ upp eller ge nytt uppdrag…';
+  }
+}
+function newTask(){
+  if(RUN.busy)RUN.ctrl.abort();
+  CONV=null;CUR=null;FILES=[];NOTES=[];feed.innerHTML='';
+  Object.keys(AG).forEach(k=>{if(AG[k].hired)delete AG[k]});renderTeam();window.OFFICE?.sync(AG);window.OFFICE?.task('');resetTeam();
+  $('#hero').style.display='';inp.placeholder='Ge teamet ett uppdrag…';
+}
+
+/* Historik */
+const loadHist=()=>{try{return JSON.parse(localStorage.ak_hist||'[]')}catch{return[]}};
+function saveHist(h){
+  let a=loadHist().filter(x=>x.id!==h.id);a.unshift({id:h.id,task:h.task,turns:h.turns,files:(h.files||[]).map(f=>({name:f.name,content:f.content.slice(0,200000)})),d:Date.now()});
+  a=a.slice(0,30);
+  try{localStorage.ak_hist=JSON.stringify(a)}catch{a.length=10;try{localStorage.ak_hist=JSON.stringify(a)}catch{}}
+}
+function openSheet(html){$('#pn').innerHTML='<div class="grab"></div>'+html;$('#sheet').classList.add('open')}
+function closeSheet(){$('#sheet').classList.remove('open')}
+$('#sheet .bk').onclick=closeSheet;
+$('#bHist').onclick=()=>{
+  const a=loadHist();
+  openSheet(`<h3>Historik</h3><p class="hint">Dina senaste uppdrag sparas lokalt i webbläsaren.</p>${a.length?a.map((h,i)=>`<div class="hi" data-i="${i}"><b>${esc(h.task.slice(0,110))}</b><span>${new Date(h.d).toLocaleString('sv-SE')} · ${h.turns.length} svar${h.files?.length?' · '+h.files.length+' filer':''}</span></div>`).join('')+'<button class="prim" id="clrH" style="background:rgba(255,122,138,.2)">Rensa historik</button>':'<p class="hint">Inget här än.</p>'}`);
+  $('#pn').querySelectorAll('.hi').forEach(el=>el.onclick=()=>{
+    const h=a[+el.dataset.i];newTask();$('#hero').style.display='none';
+    h.turns.forEach(t=>{userBubble(t.q);showResult(t.a,h.files)});closeSheet();
+  });
+  const c=$('#clrH');if(c)c.onclick=()=>{localStorage.removeItem('ak_hist');closeSheet();toast('Historik rensad')};
+};
+
+/* Inställningar */
+$('#bSet').onclick=()=>{
+  const opt=(v,l)=>`<option value="${v}"${S.provider===v?' selected':''}>${l}</option>`;
+  const key=(p,l)=>`<div class="fld"><label>${l}-nyckel</label><input type="password" id="k_${p}" value="${esc(S.keys[p])}" placeholder="Valfri" autocomplete="off"><small>Gratis nyckel: <a href="${PROV[p].link}" target="_blank" rel="noopener">${PROV[p].link.replace('https://','')}</a></small></div>`;
+  const mod=(p,l)=>`<div class="fld"><label>${l}</label><input id="m_${p}" value="${esc(S.models[p])}"></div>`;
+  openSheet(`<h3>Inställningar</h3><p class="hint">Utan nyckel körs Pollinations (gratis, men långsam och kvotbegränsad). En gratis Gemini- eller Groq-nyckel gör agenterna mycket snabbare och smartare. Nycklar sparas bara på din enhet.</p>
+  <div class="fld"><label>AI-leverantör</label><select id="s_prov">${opt('auto','Auto – bästa tillgängliga')}${opt('gemini','Google Gemini')}${opt('groq','Groq')}${opt('openrouter','OpenRouter')}${opt('pollinations','Pollinations (ingen nyckel)')}${opt('custom','Egen OpenAI-kompatibel')}</select></div>
+  ${key('gemini','Gemini')}${key('groq','Groq')}${key('openrouter','OpenRouter')}
+  <h4 class="sec">Modeller</h4><div class="row2">${mod('gemini','Gemini')}${mod('groq','Groq')}${mod('openrouter','OpenRouter')}${mod('pollinations','Pollinations')}</div>
+  <h4 class="sec">Egen leverantör</h4>
+  <div class="fld"><label>URL (chat/completions)</label><input id="s_curl" value="${esc(S.customUrl)}" placeholder="https://…/v1/chat/completions"></div>
+  <div class="row2"><div class="fld"><label>Nyckel</label><input type="password" id="k_custom" value="${esc(S.keys.custom)}"></div>${mod('custom','Modell')}</div>
+  <h4 class="sec">Skrapning & gränser</h4>
+  <div class="fld"><label>Egen CORS-proxy (valfri)</label><input id="s_proxy" value="${esc(S.proxy)}" placeholder="https://min-proxy.workers.dev/?url={url}"><small>{url} ersätts med sidans adress. Används före de publika proxyerna.</small></div>
+  <div class="row2"><div class="fld"><label>Max steg – Chef</label><input type="number" id="s_ms" value="${S.maxSteps}" min="4" max="40"></div><div class="fld"><label>Max steg – agenter</label><input type="number" id="s_ss" value="${S.subSteps}" min="3" max="30"></div></div>
+  <button class="prim" id="s_save">Spara</button>`);
+  $('#s_save').onclick=()=>{
+    S.provider=$('#s_prov').value;['gemini','groq','openrouter','custom'].forEach(p=>S.keys[p]=$('#k_'+p).value.trim());
+    ['gemini','groq','openrouter','pollinations','custom'].forEach(p=>S.models[p]=$('#m_'+p).value.trim());
+    S.customUrl=$('#s_curl').value.trim();S.proxy=$('#s_proxy').value.trim();
+    S.maxSteps=Math.max(4,+$('#s_ms').value||16);S.subSteps=Math.max(3,+$('#s_ss').value||10);
+    saveS();setProvBadge();closeSheet();toast('Sparat');
+  };
+};
+
+/* Exempel + input */
+const EX=['📰 Skrapa rubrikerna från svt.se/nyheter och sammanfatta dagens 5 viktigaste nyheter',
+  '💰 Hitta 5 realistiska sätt att tjäna pengar som indie-utvecklare med AI 2026 – med källor',
+  '🌦️ Hämta väderprognosen för Stockholm via Open-Meteo och gör en tabell med snittemp per dag',
+  '📱 Jämför Galaxy S25 och Pixel 10: specs, pris i Sverige och omdömen, i en tabell',
+  '🚀 Gör en lanseringsplan för min nya app, skriv 3 TikTok-manus och skapa en logotyp'];
+$('#chips').innerHTML=EX.map(e=>`<button class="chip">${esc(e)}</button>`).join('');
+$('#chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{inp.value=b.textContent.replace(/^\S+\s/,'');autosize();inp.focus()});
+function autosize(){inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,140)+'px'}
+inp.addEventListener('input',autosize);
+inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!('ontouchstart' in window)){e.preventDefault();start()}});
+go.onclick=()=>RUN.busy?RUN.ctrl.abort():start();
+$('#bNew').onclick=newTask;
+
+/* PWA */
+if('serviceWorker' in navigator&&location.protocol==='https:'){
+  navigator.serviceWorker.register('sw.js').then(r=>{r.update();r.addEventListener('updatefound',()=>{const w=r.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='activated'&&navigator.serviceWorker.controller)toast('Ny version installerad – laddar om…'),setTimeout(()=>location.reload(),1200)})})}).catch(()=>{});
+}
+renderTeam();setProvBadge();
+</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+try{init()}catch(e){console.error(e);document.body.classList.remove('has3d')}
+
+function init(){
+const PI=Math.PI,V3=THREE.Vector3;
+const wrap=document.getElementById('office'),cv=document.getElementById('gl');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:false,powerPreference:'high-performance'});
+R.setPixelRatio(1);
+document.body.classList.add('has3d');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x141726);
+scene.fog=new THREE.Fog(0x141726,10,26);
+const cam=new THREE.PerspectiveCamera(55,1,.05,60);
+const RENDER_H=250; // låg intern upplösning = PS2-känsla
+function resize(){const w=wrap.clientWidth||320,h=wrap.clientHeight||220,s=Math.min(1,RENDER_H/h);R.setSize(Math.max(64,Math.round(w*s)),Math.max(48,Math.round(h*s)),false);cam.aspect=w/h;cam.fov=Math.min(82,Math.max(50,2*Math.atan(Math.tan(38*Math.PI/180)/cam.aspect)*180/Math.PI));cam.updateProjectionMatrix()}
+new ResizeObserver(resize).observe(wrap);resize();
+
+/* ---------- Texturer (handritade på canvas, låg upplösning) ---------- */
+function CT(w,h,draw,rx,ry){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g,w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;if(rx){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry)}t.userData={g,c};return t}
+function noise(g,w,h,n,cols,a=.3){for(let i=0;i<n;i++){g.globalAlpha=Math.random()*a;g.fillStyle=cols[i%cols.length];g.fillRect(Math.random()*w|0,Math.random()*h|0,1,1)}g.globalAlpha=1}
+const carpetT=CT(64,64,(g,w,h)=>{g.fillStyle='#3b4760';g.fillRect(0,0,w,h);noise(g,w,h,1800,['#262f44','#56647f','#4b3e66','#33405a'],.5);g.strokeStyle='rgba(0,0,0,.25)';g.strokeRect(.5,.5,w-1,h-1)},11,10);
+const ceilT=CT(64,64,(g,w,h)=>{g.fillStyle='#d8d5ca';g.fillRect(0,0,w,h);noise(g,w,h,500,['#8f8b80','#b5b1a6'],.6);g.strokeStyle='#8d897e';g.lineWidth=3;g.strokeRect(0,0,w,h)},9,8);
+const wallT=CT(64,64,(g,w,h)=>{g.fillStyle='#c9bd9c';g.fillRect(0,0,w,h);noise(g,w,h,900,['#a89c7d','#ddd2b4'],.35);for(let x=0;x<w;x+=8){g.fillStyle='rgba(0,0,0,.035)';g.fillRect(x,0,3,h)}},7,2);
+const woodT=CT(64,32,(g,w,h)=>{g.fillStyle='#8b5d35';g.fillRect(0,0,w,h);for(let i=0;i<26;i++){g.strokeStyle=`rgba(${60+Math.random()*40|0},${30+Math.random()*20|0},10,.35)`;g.beginPath();const y=Math.random()*h;g.moveTo(0,y);g.bezierCurveTo(20,y+rnd(-3,3),40,y+rnd(-3,3),64,y+rnd(-2,2));g.stroke()}});
+const keyT=CT(64,24,(g,w,h)=>{g.fillStyle='#cfc6ad';g.fillRect(0,0,w,h);g.fillStyle='#e8e1cc';for(let r=0;r<4;r++)for(let c=0;c<14;c++)g.fillRect(2+c*4.4,2+r*5,3.4,4)});
+const cabT=CT(32,64,(g,w,h)=>{g.fillStyle='#8e939c';g.fillRect(0,0,w,h);noise(g,w,h,200,['#6d727b','#a9aeb7']);for(let i=0;i<4;i++){g.strokeStyle='#5f646c';g.strokeRect(2,2+i*15.5,w-4,14);g.fillStyle='#3d4047';g.fillRect(12,7+i*15.5,8,3)}});
+const blobT=CT(32,32,(g)=>{const r=g.createRadialGradient(16,16,0,16,16,16);r.addColorStop(0,'rgba(0,0,0,.55)');r.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=r;g.fillRect(0,0,32,32)});
+function rnd(a,b){return a+Math.random()*(b-a)}
+
+const L=o=>new THREE.MeshLambertMaterial(o);
+const B=o=>new THREE.MeshBasicMaterial(o);
+const gc={};const box=(w,h,d)=>gc[`b${w}|${h}|${d}`]||(gc[`b${w}|${h}|${d}`]=new THREE.BoxGeometry(w,h,d));
+const cyl=(a,b,h,s=8)=>gc[`c${a}|${b}|${h}|${s}`]||(gc[`c${a}|${b}|${h}|${s}`]=new THREE.CylinderGeometry(a,b,h,s));
+function M(geo,mat,x=0,y=0,z=0,p){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);if(p)p.add(m);return m}
+const woodM=L({map:woodT}),greyM=L({color:0x8a8f99}),darkM=L({color:0x2a2d35}),beigeM=L({color:0xd6ceb5}),paperM=L({color:0xf2f2ea}),blackM=L({color:0x111111}),metalM=L({color:0xb9bec7});
+const blobM=B({map:blobT,transparent:true,depthWrite:false});
+function blob(p,s,x=0,z=0){const m=M(gc.pl||(gc.pl=new THREE.PlaneGeometry(1,1)),blobM,x,.012,z,p);m.rotation.x=-PI/2;m.scale.set(s,s,1);return m}
+
+/* ---------- Rummet ---------- */
+const RW=15,RH=3.7,RD=14,RZ=.6;
+M(new THREE.BoxGeometry(RW,RH,RD),[L({map:wallT,side:THREE.BackSide}),L({map:wallT,side:THREE.BackSide}),L({map:ceilT,side:THREE.BackSide}),L({map:carpetT,side:THREE.BackSide}),L({map:wallT,side:THREE.BackSide}),L({map:wallT,side:THREE.BackSide})],0,RH/2,RZ,scene);
+const bbM=L({color:0x4a3f33});
+M(box(RW,.12,.04),bbM,0,.06,RZ-RD/2+.02,scene);M(box(RW,.12,.04),bbM,0,.06,RZ+RD/2-.02,scene);
+M(box(.04,.12,RD),bbM,-RW/2+.02,.06,RZ,scene);M(box(.04,.12,RD),bbM,RW/2-.02,.06,RZ,scene);
+const lampM=B({color:0xfffbe8}),lamps=[];
+for(const x of[-4.5,0,4.5])for(const z of[-3.5,.8,5]){const m=M(new THREE.PlaneGeometry(1.3,.55),lampM,x,RH-.01,z,scene);m.rotation.x=PI/2;lamps.push(m)}
+const flickM=B({color:0xfffbe8});lamps[4].material=flickM;
+scene.add(new THREE.HemisphereLight(0xfff2d8,0x454a68,2.3));
+const sun=new THREE.DirectionalLight(0xffffff,1.4);sun.position.set(3,6,5);scene.add(sun);
+const BACK=RZ-RD/2+.015;
+
+// Skylt
+const signT=CT(256,40,(g,w,h)=>{g.fillStyle='#1d2340';g.fillRect(0,0,w,h);g.font='bold 24px Arial Black,Arial';g.textAlign='center';g.fillStyle='#8ab4ff';g.fillText('AGENTKÅREN AB',w/2,29)});
+M(new THREE.PlaneGeometry(2.6,.4),B({map:signT}),0,2.7,BACK,scene);
+// Whiteboard
+const wbT=CT(256,150,()=>{});
+const wb=new THREE.Group();wb.position.set(-3.1,1.65,BACK+.02);scene.add(wb);
+M(box(2.5,1.45,.04),greyM,0,0,0,wb);M(new THREE.PlaneGeometry(2.4,1.35),L({map:wbT}),0,0,.025,wb);M(box(2.2,.04,.1),greyM,0,-.74,.05,wb);
+let WB={task:'',notes:[]};
+function drawWB(){const g=wbT.userData.g,w=256,h=150;g.fillStyle='#f7f8f4';g.fillRect(0,0,w,h);g.font='bold 15px "Comic Sans MS",cursive';g.fillStyle='#1d4ed8';g.fillText('UPPDRAG',10,20);
+  g.fillStyle='#222';g.font='12px "Comic Sans MS",cursive';let y=wrapT(g,WB.task||'Väntar på chefens order…',10,38,236,14,WB.notes.length?4:7);
+  if(WB.notes.length){g.fillStyle='#c0262d';g.font='bold 12px "Comic Sans MS",cursive';g.fillText('ANTECKNINGAR',10,y+8);g.font='11px "Comic Sans MS",cursive';y+=22;for(const n of WB.notes.slice(-3)){y=wrapT(g,'• '+n,10,y,236,13,2)+1}}
+  wbT.needsUpdate=true}
+function wrapT(g,text,x,y,mw,lh,max){const ws=String(text).split(/\s+/);let line='',n=0;for(let i=0;i<ws.length;i++){const t=line?line+' '+ws[i]:ws[i];if(g.measureText(t).width>mw&&line){if(n===max-1){g.fillText(line+'…',x,y+n*lh);return y+(n+1)*lh}g.fillText(line,x,y+n*lh);n++;line=ws[i]}else line=t}if(line){g.fillText(line,x,y+n*lh);n++}return y+n*lh}
+drawWB();
+// Klocka
+const clT=CT(64,64,()=>{});
+M(new THREE.CircleGeometry(.3,16),B({map:clT}),3.1,2.25,BACK+.02,scene);
+function drawClock(){const g=clT.userData.g,d=new Date();g.fillStyle='#222';g.beginPath();g.arc(32,32,32,0,7);g.fill();g.fillStyle='#f4f1e6';g.beginPath();g.arc(32,32,28,0,7);g.fill();g.fillStyle='#333';for(let i=0;i<12;i++){const a=i/12*PI*2;g.fillRect(32+Math.sin(a)*23-1,32-Math.cos(a)*23-1,2,2)}
+  const hand=(a,l,wd,c)=>{g.strokeStyle=c;g.lineWidth=wd;g.beginPath();g.moveTo(32,32);g.lineTo(32+Math.sin(a)*l,32-Math.cos(a)*l);g.stroke()};
+  hand(((d.getHours()%12)+d.getMinutes()/60)/12*PI*2,13,3,'#222');hand(d.getMinutes()/60*PI*2,20,2,'#222');hand(d.getSeconds()/60*PI*2,22,1,'#c00');clT.needsUpdate=true}
+// Fönster
+const hr=new Date().getHours(),night=hr<7||hr>=18;
+const skyT=CT(160,56,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);if(night){gr.addColorStop(0,'#050a1f');gr.addColorStop(1,'#1c2450')}else{gr.addColorStop(0,'#5ea8ff');gr.addColorStop(1,'#cfe6ff')}g.fillStyle=gr;g.fillRect(0,0,w,h);
+  if(night){for(let i=0;i<40;i++){g.fillStyle='rgba(255,255,255,'+Math.random()+')';g.fillRect(Math.random()*w,Math.random()*h*.5,1,1)}}else{g.fillStyle='rgba(255,255,255,.8)';for(let i=0;i<4;i++){const x=rnd(0,w),y=rnd(5,20);g.beginPath();g.ellipse(x,y,rnd(10,20),4,0,0,7);g.fill()}}
+  let x=0;while(x<w){const bw=rnd(10,22),bh=rnd(14,40);g.fillStyle=night?'#0b0f22':'#7a8496';g.fillRect(x,h-bh,bw,bh);for(let yy=h-bh+3;yy<h-2;yy+=5)for(let xx=x+2;xx<x+bw-2;xx+=4){if(Math.random()<(night?.35:.15)){g.fillStyle=night?'#ffd76a':'#c3d4e8';g.fillRect(xx,yy,2,2)}}x+=bw+1}});
+const win=new THREE.Group();win.position.set(RW/2-.02,1.8,-1);win.rotation.y=-PI/2;scene.add(win);
+M(new THREE.PlaneGeometry(4.2,1.5),B({map:skyT}),0,0,0,win);
+for(const x of[-2.1,-.7,.7,2.1])M(box(.07,1.55,.08),L({color:0xe8e8e8}),x,0,.02,win);
+M(box(4.3,.08,.1),L({color:0xe8e8e8}),0,.77,.02,win);M(box(4.3,.1,.2),L({color:0xe8e8e8}),0,-.78,.06,win);
+// Dörr
+const door=new THREE.Group();door.position.set(-RW/2+.03,1.06,5.6);door.rotation.y=PI/2;scene.add(door);
+M(box(1.05,2.12,.04),woodM,0,0,0,door);M(box(.08,.04,.06),metalM,.4,-.05,.05,door);
+M(box(1.2,.08,.06),L({color:0xe8e8e8}),0,1.08,0,door);
+// Rekvisita
+function plant(x,z,s=1){const p=new THREE.Group();p.position.set(x,0,z);p.scale.setScalar(s);scene.add(p);M(cyl(.18,.14,.36),L({color:0xb5562d}),0,.18,0,p);const lf=L({color:0x2f8f46}),lf2=L({color:0x3fb35a});for(let i=0;i<7;i++){const c=M(gc.cone||(gc.cone=new THREE.ConeGeometry(.12,.7,5)),i%2?lf:lf2,rnd(-.1,.1),.6+rnd(0,.3),rnd(-.1,.1),p);c.rotation.set(rnd(-.5,.5),rnd(0,6),rnd(-.5,.5))}blob(p,.8)}
+plant(-6.8,-5.7,1.2);plant(6.8,6.6,1.1);plant(-6.8,3.5,.9);plant(6.8,-5.6,1.3);
+for(const x of[4.6,5.35]){const c=new THREE.Group();c.position.set(x,0,BACK+.35);scene.add(c);M(box(.7,1.3,.6),[greyM,greyM,greyM,greyM,L({map:cabT}),greyM],0,.65,0,c);blob(c,1.1)}
+M(box(.55,.3,.45),L({color:0xdedad0}),4.6,1.45,BACK+.35,scene);M(box(.4,.02,.3),paperM,4.6,1.61,BACK+.35,scene);
+// Vattenautomat
+const wc=new THREE.Group();wc.position.set(-6.7,0,-3.6);scene.add(wc);M(box(.4,1,.4),L({color:0xf0f0f0}),0,.5,0,wc);M(cyl(.16,.16,.45,10),new THREE.MeshLambertMaterial({color:0x6fb7ff,transparent:true,opacity:.65}),0,1.23,0,wc);M(box(.08,.06,.04),L({color:0x3060c0}),.06,.75,.21,wc);M(box(.08,.06,.04),L({color:0xc03030}),-.06,.75,.21,wc);blob(wc,.8);
+// Bokhylla
+const bs=new THREE.Group();bs.position.set(-RW/2+.25,0,-.8);bs.rotation.y=PI/2;scene.add(bs);M(box(1.6,2,.4),woodM,0,1,0,bs);
+const bc=[0xc0392b,0x2980b9,0x27ae60,0xf1c40f,0x8e44ad,0xe67e22,0x34495e];for(let s=0;s<4;s++){let x=-.72;while(x<.7){const w=rnd(.05,.11),hh=rnd(.28,.38);M(box(w,hh,.28),L({color:bc[Math.random()*bc.length|0]}),x+w/2,.16+s*.47+hh/2,.06,bs);x+=w+.01}M(box(1.55,.03,.38),darkM,0,.14+s*.47,.02,bs)}
+// Kaffehörna
+const kt=new THREE.Group();kt.position.set(-6.7,0,1.8);kt.rotation.y=PI/2;scene.add(kt);M(box(1,.75,.55),woodM,0,.375,0,kt);M(box(.32,.42,.3),blackM,-.2,.96,0,kt);M(box(.1,.05,.05),L({color:0xff3333}),-.2,1.1,.16,kt);M(cyl(.05,.04,.1),L({color:0xffffff}),.25,.8,.05,kt);M(cyl(.05,.04,.1),L({color:0xe74c3c}),.38,.8,-.05,kt);blob(kt,1.2);
+
+/* ---------- Skrivbord ---------- */
+function makeDesk(chef){
+  const d=new THREE.Group(),w=chef?2.1:1.5;
+  M(box(w,.06,.82),woodM,0,.745,0,d);
+  M(box(.05,.72,.76),greyM,-w/2+.06,.37,0,d);M(box(.05,.72,.76),greyM,w/2-.06,.37,0,d);M(box(w-.15,.42,.03),greyM,0,.5,-.36,d);
+  if(chef){M(box(.5,.62,.7),woodM,w/2-.35,.37,0,d)}
+  const crt=new THREE.Group();crt.position.set(chef?-.35:0,.775,-.14);d.add(crt);
+  M(box(.52,.42,.42),beigeM,0,.27,0,crt);M(box(.36,.3,.22),beigeM,0,.25,-.28,crt);M(box(.3,.04,.26),beigeM,0,.02,0,crt);
+  const sc=document.createElement('canvas');sc.width=160;sc.height=120;const st=new THREE.CanvasTexture(sc);st.colorSpace=THREE.SRGBColorSpace;
+  M(new THREE.PlaneGeometry(.42,.32),B({map:st}),0,.28,.212,crt);
+  M(box(.47,.026,.16),[beigeM,beigeM,L({map:keyT}),beigeM,beigeM,beigeM],chef?-.35:0,.79,.2,d);
+  M(box(.06,.03,.1),beigeM,(chef?-.35:0)+.34,.79,.22,d);
+  M(cyl(.045,.038,.11),L({color:[0xe74c3c,0x3498db,0xf1c40f,0xffffff,0x2ecc71][Math.random()*5|0]}),-w/2+.25,.83,.15,d);
+  for(let i=0;i<3;i++){const p=M(box(.22,.012,.3),paperM,w/2-.32,.785+i*.013,-.05,d);p.rotation.y=rnd(-.3,.3)}
+  M(new THREE.PlaneGeometry(.07,.07),L({color:0xfff176,side:THREE.DoubleSide}),(chef?-.35:0)+.27,1.0,.08,d).rotation.y=-.2;
+  if(Math.random()<.5||chef){const lp=new THREE.Group();lp.position.set(-w/2+.22,.78,-.25);d.add(lp);M(cyl(.07,.08,.03),darkM,0,.015,0,lp);M(cyl(.012,.012,.35),darkM,0,.19,0,lp);const sh=M(new THREE.ConeGeometry(.09,.13,8,1,true),L({color:chef?0x1f7a3a:0x2c3e50,side:THREE.DoubleSide}),0,.36,.05,lp);sh.rotation.x=.6}
+  if(chef){const np=new THREE.Group();np.position.set(.2,.8,.32);d.add(np);const nt=CT(96,24,(g,w,h)=>{g.fillStyle='#1b1b1b';g.fillRect(0,0,w,h);g.fillStyle='#e8c66a';g.font='bold 14px Georgia';g.textAlign='center';g.fillText('CHEF',w/2,17)});const n=M(box(.3,.07,.04),[darkM,darkM,darkM,darkM,B({map:nt}),darkM],0,0,0,np);n.rotation.x=-.4;n.rotation.y=PI}
+  // stol
+  const ch=new THREE.Group();ch.position.set(0,0,.8);d.add(ch);const cm=L({color:chef?0x5a1d1d:0x23262e});
+  M(box(.5,.08,.5),cm,0,.48,0,ch);M(box(.5,chef?.75:.55,.07),cm,0,chef?.9:.8,.25,ch);M(cyl(.03,.03,.4),metalM,0,.25,0,ch);
+  const b1=M(box(.6,.04,.06),darkM,0,.05,0,ch);const b2=M(box(.06,.04,.6),darkM,0,.05,0,ch);b1.rotation.y=b2.rotation.y=.4;
+  blob(d,w+.4);blob(ch,.8);
+  return{d,sc,st};
+}
+
+/* ---------- Agenter ---------- */
+const SLOTS={chef:{x:0,z:-3.55,ry:PI,chef:1},forskare:{x:-2.9,z:-1.3,ry:-.25},skrapare:{x:2.9,z:-1.3,ry:.25},analytiker:{x:-2.9,z:1.3,ry:-.25},skribent:{x:2.9,z:1.3,ry:.25}};
+const EXTRA=[{x:-5.6,z:-3.2,ry:-.45},{x:5.6,z:-3.2,ry:.45},{x:-5.6,z:.2,ry:-.45},{x:5.6,z:.2,ry:.45},{x:-1.2,z:3.3,ry:-.1},{x:1.2,z:3.3,ry:.1}];
+const SKIN=['#f1c27d','#e0ac69','#c68642','#8d5524','#ffdbac','#d6a77a'],HAIR=['#2b1d14','#6b4423','#111','#c9a15a','#8b2e16','#444','#b0b0b0'];
+const agents={};let tNow=0;
+function faceTex(skin,i){return CT(32,32,(g)=>{g.fillStyle=skin;g.fillRect(0,0,32,32);g.fillStyle='#1a1a1a';g.fillRect(8,12,4,5);g.fillRect(20,12,4,5);g.fillStyle='#fff';g.fillRect(9,13,1,1);g.fillRect(21,13,1,1);g.fillStyle='rgba(0,0,0,.5)';g.fillRect(7,9,6,2);g.fillRect(19,9,6,2);g.fillStyle='rgba(0,0,0,.15)';g.fillRect(15,16,2,5);g.fillStyle='#8a3b3b';i%3===0?g.fillRect(11,24,10,2):(g.fillRect(11,23,2,2),g.fillRect(13,25,6,2),g.fillRect(19,23,2,2))})}
+function makePerson(a,idx,chef){
+  const skin=SKIN[idx%SKIN.length],hair=HAIR[(idx*3+1)%HAIR.length];
+  const root=new THREE.Group(),body=new THREE.Group();root.add(body);
+  const shirt=L({color:new THREE.Color(a.c)}),pants=L({color:chef?0x1d1f2b:0x2f3445}),sk=L({color:skin}),hm=L({color:hair}),shoe=L({color:0x161616});
+  M(box(.38,.46,.22),shirt,0,.78,0,body);
+  if(chef){M(box(.07,.3,.012),L({color:0xb01c2e}),0,.82,-.116,body);M(box(.39,.47,.2),L({color:0x1d1f2b}),0,.78,.02,body).scale.set(1.02,1,1)}
+  M(box(.1,.06,.1),sk,0,1.03,0,body);
+  const head=new THREE.Group();head.position.y=1.06;body.add(head);
+  M(box(.26,.28,.26),[sk,sk,sk,sk,sk,L({map:faceTex(skin,idx)})],0,.14,0,head);
+  M(box(.28,.07,.28),hm,0,.3,0,head);M(box(.28,.2,.05),hm,0,.2,.13,head);M(box(.05,.14,.24),hm,-.14,.22,.02,head);M(box(.05,.14,.24),hm,.14,.22,.02,head);
+  if(chef||idx%4===2){const gl=L({color:0x111111});M(box(.27,.025,.02),gl,0,.17,-.135,head)}
+  const arms=[-1,1].map(s=>{const sh=new THREE.Group();sh.position.set(s*.245,.97,0);body.add(sh);M(box(.1,.3,.1),shirt,0,-.15,0,sh);const el=new THREE.Group();el.position.y=-.3;sh.add(el);M(box(.09,.26,.09),shirt,0,-.13,0,el);M(box(.08,.08,.08),sk,0,-.3,0,el);return{sh,el,s}});
+  const legs=[-1,1].map(s=>{const hip=new THREE.Group();hip.position.set(s*.1,.54,0);body.add(hip);M(box(.15,.44,.16),pants,0,-.22,0,hip);const kn=new THREE.Group();kn.position.y=-.44;hip.add(kn);M(box(.13,.42,.13),pants,0,-.21,0,kn);M(box(.13,.07,.22),shoe,0,-.43,-.04,kn);return{hip,kn,s}});
+  blob(root,.7);
+  return{root,body,head,arms,legs};
+}
+function seatOf(sl){const s=Math.sin(sl.ry),c=Math.cos(sl.ry);return{x:sl.x+.8*s,z:sl.z+.8*c,ry:sl.ry}}
+function addAgent(id,a,walkIn){
+  const keys=Object.keys(agents);const idx=keys.length;
+  let sl=SLOTS[id];if(!sl){const used=new Set(Object.values(agents).map(x=>x.slot));sl=EXTRA.find(e=>!used.has(e))||{x:rnd(-4,4),z:rnd(-2,3),ry:0}}
+  const dk=makeDesk(!!sl.chef);dk.d.position.set(sl.x,0,sl.z);dk.d.rotation.y=sl.ry;scene.add(dk.d);
+  const p=makePerson(a,idx,!!sl.chef);scene.add(p.root);
+  const seat=seatOf(sl);
+  const tag=document.createElement('div');tag.className='tag';tag.style.setProperty('--c',a.c);tag.innerHTML=`<b>${a.emoji} ${esc3(a.name)}</b><span>Vilar</span>`;
+  tag.onclick=()=>{focusId=id;userUntil=performance.now()+12000};wrap.append(tag);
+  const A={id,a,...p,desk:dk.d,sc:dk.sc,st:dk.st,g:dk.sc.getContext('2d'),slot:sl,seat,state:'idle',txt:'Vilar',log:[],seed:Math.random()*10,tag,cheer:0,path:null,lastDraw:0,born:tNow};
+  if(walkIn){A.state0='idle';A.path=[new V3(-6.9,0,5.6),new V3(-5.8,0,5.3),new V3(seat.x,0,5.3),new V3(seat.x,0,seat.z)];A.root.position.copy(A.path[0]);dk.d.scale.setScalar(.01);A.grow=0}
+  else{A.root.position.set(seat.x,0,seat.z);A.root.rotation.y=seat.ry}
+  agents[id]=A;drawScreen(A,0);return A;
+}
+function esc3(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function removeAgent(id){const A=agents[id];if(!A)return;scene.remove(A.root);scene.remove(A.desk);A.tag.remove();delete agents[id]}
+
+/* ---------- Skärmar ---------- */
+function drawScreen(A,t){
+  const g=A.g,w=160,h=120;
+  if(A.state==='idle'&&!A.log.length||A.path){
+    g.fillStyle='#000a18';g.fillRect(0,0,w,h);g.font='26px serif';g.textAlign='center';
+    g.fillText(A.a.emoji,(Math.sin(t*.6+A.seed)*.5+.5)*(w-40)+20,(Math.cos(t*.45+A.seed*2)*.5+.5)*(h-40)+34);
+    g.font='bold 9px monospace';g.fillStyle='#3a5a8a';g.fillText('zZz',w/2,h-6);
+  }else{
+    g.fillStyle='#04121f';g.fillRect(0,0,w,h);g.fillStyle=A.a.c;g.fillRect(0,0,w,13);
+    g.fillStyle='#000';g.font='bold 9px monospace';g.textAlign='left';g.fillText((A.a.name+' > '+A.txt).slice(0,30),3,10);
+    g.font='8px monospace';const lines=A.log.slice(-10);
+    lines.forEach((l,i)=>{g.fillStyle=i===lines.length-1?'#b6ffd5':'#4fd18b';g.fillText(l.slice(0,34),3,24+i*9.5)});
+    if(A.state==='done'){g.fillStyle='rgba(0,0,0,.55)';g.fillRect(0,h/2-14,w,28);g.fillStyle='#7ef0c1';g.font='bold 16px monospace';g.textAlign='center';g.fillText('✓ KLAR',w/2,h/2+6)}
+    else if((t*2|0)%2){g.fillStyle='#b6ffd5';g.fillRect(3,24+Math.min(lines.length,10)*9.5-7,5,8)}
+  }
+  g.fillStyle='rgba(0,0,0,.18)';for(let y=0;y<h;y+=2)g.fillRect(0,y,w,1);
+  const v=g.createRadialGradient(w/2,h/2,h*.3,w/2,h/2,h*.85);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.6)');g.fillStyle=v;g.fillRect(0,0,w,h);
+  A.st.needsUpdate=true;
+}
+
+/* ---------- Pappersflygplan vid delegering ---------- */
+const planes=[];const planeGeo=new THREE.ConeGeometry(.07,.22,3);planeGeo.rotateX(PI/2);const planeM=L({color:0xffffff});
+function handoff(from,to){const A=agents[from],Bq=agents[to];if(!A||!Bq)return;const a=new V3(),b=new V3();A.head.getWorldPosition(a);Bq.head.getWorldPosition(b);a.y+=.3;b.y+=.3;const m=M(planeGeo,planeM,a.x,a.y,a.z,scene);planes.push({m,a,b,t:0})}
+
+/* ---------- Kamera ---------- */
+let focusId=null,userUntil=0,userYaw=0,userPitch=0,big=false;
+const cur={t:new V3(0,.9,-.4),yaw:0,pitch:.3,dist:7};
+function camGoal(){
+  const act=Object.values(agents).filter(a=>a.state==='think'||a.state==='work');
+  let id=performance.now()<userUntil&&focusId?focusId:(act.length===1?act[0].id:null);
+  if(id&&agents[id]&&!agents[id].path){const A=agents[id];const p=new V3();A.head.getWorldPosition(p);
+    if(A.slot.chef)return{t:p.setY(p.y-.05),yaw:-.55,pitch:.2,dist:2.4};
+    p.x-=Math.sin(A.seat.ry)*.35;p.z-=Math.cos(A.seat.ry)*.35;return{t:p.setY(p.y-.2),yaw:A.seat.ry+(A.seat.x<0?.45:-.45),pitch:.62,dist:1.9}}
+  return{t:new V3(0,.6,-.6),yaw:Math.sin(tNow*.12)*.12,pitch:.46,dist:7.2};
+}
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,m:0};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.m+=Math.abs(dx)+Math.abs(dy);userYaw=Math.max(-1.2,Math.min(1.2,userYaw-dx*.006));userPitch=Math.max(-.2,Math.min(.35,userPitch+dy*.004));drag.x=e.clientX;drag.y=e.clientY;userUntil=performance.now()+8000});
+cv.addEventListener('pointerup',()=>{drag=null});
+let lastTap=0;cv.addEventListener('click',()=>{const n=performance.now();if(n-lastTap<320)toggleBig();lastTap=n});
+function toggleBig(){big=!big;wrap.classList.toggle('big',big)}
+document.getElementById('bBig').onclick=toggleBig;
+
+/* ---------- Animation ---------- */
+const clock=new THREE.Clock();const tmp=new V3();let clockT=0;
+const lerp=(a,b,k)=>a+(b-a)*k;
+function angLerp(a,b,k){let d=((b-a+PI)%(2*PI)+2*PI)%(2*PI)-PI;return a+d*k}
+function pose(A,t,dt){
+  const ph=t+A.seed,[L1,R1]=A.arms,[LL,RL]=A.legs;
+  const set=(o,x,k=1)=>o.rotation.x=lerp(o.rotation.x,x,Math.min(1,dt*10*k));
+  if(A.path){
+    const tgt=A.path[0];tmp.copy(tgt).sub(A.root.position);tmp.y=0;const d=tmp.length();
+    if(d<.08){A.path.shift();if(!A.path.length){A.path=null;A.root.rotation.y=A.seat.ry;A.root.position.set(A.seat.x,0,A.seat.z)}}
+    else{tmp.normalize();A.root.position.addScaledVector(tmp,Math.min(d,dt*1.7));A.root.rotation.y=angLerp(A.root.rotation.y,Math.atan2(-tmp.x,-tmp.z),dt*8)}
+    const w=Math.sin(t*9);A.body.position.y=.33+Math.abs(Math.cos(t*9))*.03;
+    LL.hip.rotation.x=w*.5;RL.hip.rotation.x=-w*.5;LL.kn.rotation.x=-Math.max(0,-w)*.7;RL.kn.rotation.x=-Math.max(0,w)*.7;
+    L1.sh.rotation.x=-w*.45;R1.sh.rotation.x=w*.45;L1.el.rotation.x=.25;R1.el.rotation.x=.25;A.head.rotation.set(0,0,0);return;
+  }
+  A.body.position.y=lerp(A.body.position.y,0,dt*8);
+  for(const l of A.legs){set(l.hip,PI/2);set(l.kn,-PI/2)}
+  A.body.rotation.x=lerp(A.body.rotation.x,A.state==='work'?.12:0,dt*4);
+  const breathe=1+Math.sin(ph*2)*.012;A.body.children[0].scale.y=breathe;
+  if(A.cheer>t){
+    const b=Math.abs(Math.sin(t*10))*.06;A.body.position.y=b;
+    for(const a of A.arms){set(a.sh,PI*.92,2);set(a.el,.15,2);a.sh.rotation.z=a.s*.25}
+    A.head.rotation.x=-.25;return;
+  }
+  for(const a of A.arms)a.sh.rotation.z=lerp(a.sh.rotation.z,a.s*.05,dt*6);
+  if(A.state==='work'){
+    for(const a of A.arms){set(a.sh,.78);a.el.rotation.x=.85+Math.sin(t*22+a.s*1.7)*.09}
+    A.head.rotation.x=lerp(A.head.rotation.x,.12+Math.sin(t*3)*.03,dt*5);A.head.rotation.y=lerp(A.head.rotation.y,Math.sin(t*.7+A.seed)*.08,dt*3);A.head.rotation.z=0;
+  }else if(A.state==='think'){
+    set(L1.sh,.75);set(L1.el,.85);set(R1.sh,.35);set(R1.el,2.35);R1.sh.rotation.z=-.15;
+    A.head.rotation.z=lerp(A.head.rotation.z,Math.sin(ph*1.3)*.12,dt*4);A.head.rotation.x=lerp(A.head.rotation.x,-.12,dt*4);A.head.rotation.y=lerp(A.head.rotation.y,Math.sin(ph*.5)*.35,dt*2);
+  }else{
+    set(L1.sh,.55,.5);set(L1.el,.7,.5);set(R1.sh,.55,.5);set(R1.el,.7,.5);
+    A.head.rotation.x=lerp(A.head.rotation.x,0,dt*3);A.head.rotation.z=lerp(A.head.rotation.z,0,dt*3);A.head.rotation.y=lerp(A.head.rotation.y,Math.sin(ph*.35)*.55,dt*1.5);
+  }
+}
+function loop(){
+  requestAnimationFrame(loop);if(document.hidden)return;
+  const dt=Math.min(.05,clock.getDelta());tNow+=dt;const t=tNow;
+  for(const id in agents){const A=agents[id];pose(A,t,dt);
+    if(A.grow!=null&&A.grow<1){A.grow=Math.min(1,A.grow+dt*1.4);const s=A.grow<1?Math.max(.01,1.08*Math.sin(A.grow*PI*.55)):1;A.desk.scale.setScalar(s);if(A.grow>=1)A.desk.scale.setScalar(1)}
+    if(t-A.lastDraw>(A.state==='idle'?.2:.12)){A.lastDraw=t;drawScreen(A,t)}}
+  for(let i=planes.length-1;i>=0;i--){const p=planes[i];p.t+=dt/1.3;const k=Math.min(1,p.t);const pos=new V3().lerpVectors(p.a,p.b,k);pos.y+=Math.sin(k*PI)*1.1;p.m.lookAt(pos);p.m.position.copy(pos);p.m.rotation.z=Math.sin(t*12)*.3;if(k>=1){scene.remove(p.m);planes.splice(i,1)}}
+  flickM.color.setScalar(Math.random()<.03?.45:1);
+  clockT+=dt;if(clockT>1){clockT=0;drawClock()}
+  const G=camGoal(),k=1-Math.exp(-dt*2.5);
+  cur.t.lerp(G.t,k);cur.yaw=angLerp(cur.yaw,G.yaw+userYaw*(performance.now()<userUntil?1:0),k);cur.pitch=lerp(cur.pitch,G.pitch+(performance.now()<userUntil?userPitch:0),k);cur.dist=lerp(cur.dist,G.dist,k);
+  if(performance.now()>userUntil){userYaw*=.98;userPitch*=.98}
+  const cp=Math.cos(cur.pitch);cam.position.set(cur.t.x+Math.sin(cur.yaw)*cp*cur.dist,cur.t.y+Math.sin(cur.pitch)*cur.dist,cur.t.z+Math.cos(cur.yaw)*cp*cur.dist);
+  cam.position.x=Math.max(-RW/2+.3,Math.min(RW/2-.3,cam.position.x));cam.position.y=Math.max(.4,Math.min(RH-.15,cam.position.y));cam.position.z=Math.max(RZ-RD/2+.3,Math.min(RZ+RD/2-.3,cam.position.z));
+  cam.lookAt(cur.t);
+  R.render(scene,cam);
+  const w=wrap.clientWidth,h=wrap.clientHeight;
+  for(const id in agents){const A=agents[id];A.head.getWorldPosition(tmp);tmp.y+=.45;tmp.project(cam);
+    if(tmp.z>1||Math.abs(tmp.x)>1.2||Math.abs(tmp.y)>1.2){A.tag.style.display='none';continue}
+    A.tag.style.display='';A.tag.style.transform=`translate(${(tmp.x*.5+.5)*w}px,${(-tmp.y*.5+.5)*h}px) translate(-50%,-100%)`;A.tag.style.zIndex=Math.round((1-tmp.z)*1000)}
+}
+loop();
+
+/* ---------- API mot appen ---------- */
+window.OFFICE={
+  sync(AG){for(const id in AG)if(!agents[id])addAgent(id,AG[id],!!AG[id].hired);for(const id in agents)if(!AG[id])removeAgent(id)},
+  status(id,txt,on,done){const A=agents[id];if(!A)return;A.txt=txt;A.tag.querySelector('span').textContent=txt;A.tag.classList.toggle('on',!!on);A.tag.classList.toggle('done',!!done);
+    const prev=A.state;A.state=on?(/^Tänker/.test(txt)?'think':'work'):done?'done':'idle';if(done&&prev!=='done')A.cheer=tNow+1.8;if(!on&&!done)A.log=[]},
+  log(id,line){const A=agents[id];if(!A)return;A.log.push(String(line).replace(/<[^>]+>/g,'').replace(/\s+/g,' '));if(A.log.length>40)A.log.shift()},
+  handoff,
+  task(t){WB.task=t;WB.notes=[];drawWB()},
+  notes(n){WB.notes=n.slice();drawWB()},
+};
+if(window.AG)window.OFFICE.sync(window.AG);
+}
+</script>
+
+</body>
+</html>
