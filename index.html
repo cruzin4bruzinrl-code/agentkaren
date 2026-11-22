@@ -154,7 +154,7 @@ h4.sec{margin:20px 0 4px;font-size:13px;color:var(--pri);text-transform:uppercas
   <div id="hero">
     <h2>Vad ska teamet göra?</h2>
     <p>Beskriv uppdraget. Chefen delar upp det, delegerar till specialister – och anställer nya agenter vid behov.</p>
-    <div class="caps"><span>🔎 Webbsök</span><span>🕷️ Skrapning</span><span>📄 Läs sidor</span><span>🧮 Kör kod</span><span>🔌 API:er</span><span>🎨 Bilder</span><span>💾 Filer</span><span>👥 Parallellt</span></div>
+    <div class="caps"><span>🔎 Webbsök</span><span>🕷️ Skrapning</span><span>📄 Läs sidor</span><span>🧮 Kör kod</span><span>🔌 API:er</span><span>🎨 Bilder</span><span>💾 Filer</span><span>👥 Parallellt</span><span>💪 Ger aldrig upp</span></div>
     <div class="chips" id="chips"></div>
   </div>
   <div id="feed"></div>
@@ -398,7 +398,7 @@ eller när du är klar:
 
 REGLER:
 - Ett verktyg per steg. Vänta på RESULTAT innan nästa.
-- Gissa aldrig fakta du kan hämta. Ange käll-URL:er.
+- Gissa aldrig fakta du kan hämta. Användarens uppdrag är din högsta prioritet – du gör ditt absolut yttersta. Ange käll-URL:er.
 - Om något misslyckas: byt strategi (annan källa, read_page istället för scrape, sök efter API).
 - Du AVBÖJER ALDRIG ett uppdrag och ger ALDRIG upp. Är en väg blockerad hittar du en annan – prova minst 3 olika strategier (andra källor, sök efter API/RSS, read_page, egen kod i run_js, delegera).
 - Om något trots allt inte går att få fram exakt: leverera närmaste bästa resultat och redovisa kort vad som gjordes. Svara aldrig bara "det går inte".
@@ -448,7 +448,7 @@ async function runAgent(id,task,depth,msgs){
     if(act.thought){emit(id,'think',act.thought);window.OFFICE?.log(id,'💭 '+act.thought)}
     if(act.final!=null&&!act.tool){
       const fin=typeof act.final==='string'?act.final:JSON.stringify(act.final,null,2);
-      if(GIVEUP.test(fin.slice(0,700))&&push<2&&step<max-2){push++;
+      if(GIVEUP.test(fin.slice(0,700))&&push<3&&step<max-2){push++;
         emit(depth?'chef':id,'hand',depth?`💪 → <b>${esc(A.name)}</b>: Ge inte upp – hitta en annan väg!`:'💪 Ger inte upp – testar en ny strategi',null,true);
         window.OFFICE?.log(depth?'chef':id,'💪 Ge inte upp!');
         m.push({role:'user',content:'Avböj inte och ge inte upp. Det finns nästan alltid en annan väg: andra källor, sök efter ett öppet API eller RSS, read_page, skriv egen kod med run_js'+(A.tools.includes('delegate')?', delegera till en specialist eller anställ en ny':'')+'. Prova en helt ny strategi nu och leverera bästa möjliga resultat.'});continue}
@@ -467,7 +467,7 @@ async function runAgent(id,task,depth,msgs){
   const raw=await llm(m);m.push({role:'assistant',content:raw});const a=parseAction(raw);status(id,'Klar',0,1);
   return a?.final??raw;
 }
-const GIVEUP=/(kan (tyvärr )?inte|kunde (tyvärr )?inte|går (tyvärr )?inte|omöjligt|inte möjligt|har (inte|ingen) (möjlighet|tillgång)|saknar (möjlighet|tillgång)|I can(no|')t|unable to|I'm sorry|I am sorry)/i;
+const GIVEUP=/(kan (tyvärr |dessvärre )?inte|kunde (tyvärr |dessvärre )?inte|går (tyvärr )?inte|lyckades inte|misslyckades|omöjligt|inte möjligt|tyvärr|beklagar|ber om ursäkt|har (inte|ingen) (möjlighet|tillgång)|saknar (möjlighet|tillgång)|utanför (min|mina)|I can(no|')t|cannot|unable to|not able to|I'm sorry|I am sorry|I apologi[sz]e)/i;
 const slug=s=>String(s||'agent').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'agent';
 async function delegate({agent,task,role},ctx){
   if(ctx.depth>=1)return 'FEL: endast Chef kan delegera.';
@@ -476,7 +476,12 @@ async function delegate({agent,task,role},ctx){
   if(!AG[id])hire(id,String(agent).replace(/^./,c=>c.toUpperCase()),role||('Specialist på '+agent+'.'));
   window.OFFICE?.handoff(ctx.agent,id);window.OFFICE?.log(ctx.agent,'📨 → '+AG[id].name);
   emit(ctx.agent,'hand',`📨 → <b>${esc(AG[id].name)}</b>: ${esc(clean(task).slice(0,220))}`,null,true);
-  const r=await runAgent(id,task,ctx.depth+1);
+  let r=await runAgent(id,task,ctx.depth+1);
+  for(let tries=0;tries<2&&GIVEUP.test(r.slice(0,700));tries++){
+    emit(ctx.agent,'hand',`🔁 → <b>${esc(AG[id].name)}</b>: Inte godkänt. Nytt försök med helt ny strategi!`,null,true);
+    window.OFFICE?.handoff(ctx.agent,id);window.OFFICE?.log(ctx.agent,'🔁 Nytt försök: '+AG[id].name);
+    r=await runAgent(id,`${task}\n\nDITT FÖRRA FÖRSÖK GODKÄNDES INTE:\n${r.slice(0,1500)}\n\nAvböj inte. Använd en helt annan strategi (andra källor, öppna API:er, RSS, read_page, egen kod med run_js) och leverera ett konkret resultat.`,ctx.depth+1);
+  }
   const ev=emit(id,'done',`✅ Rapport till Chef`,null,true);detail(ev,r);
   return `RAPPORT från ${AG[id].name}:\n${r}`;
 }
