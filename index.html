@@ -198,9 +198,11 @@ async function tfetch(url,opt={},ms=20000){
 /* ========== Inställningar ========== */
 const DEF={provider:'auto',keys:{gemini:'',groq:'',openrouter:'',pollinations:'',custom:''},
   models:{gemini:'gemini-3.8-flash',groq:'auto',openrouter:'meta-llama/llama-3.3-70b-instruct:free',pollinations:'openai',custom:''},
-  customUrl:'',proxy:'',maxSteps:20,subSteps:12};
+  customUrl:'',proxy:'',reserve:{on:false,model:''},maxSteps:20,subSteps:12};
 let S;try{const o=JSON.parse(localStorage.ak_set||'{}');S={...DEF,...o,keys:{...DEF.keys,...o.keys},models:{...DEF.models,...o.models}}}catch{S=structuredClone(DEF)}
-const saveS=()=>localStorage.ak_set=JSON.stringify(S);
+S.reserve={...DEF.reserve,...(S.reserve||{})};
+const reserveOk=()=>S.reserve.on&&S.reserve.model&&S.keys.openrouter;
+const saveS=()=>{S.keys.reserve=S.keys.openrouter;S.models.reserve=S.reserve.model;localStorage.ak_set=JSON.stringify(S)};
 if(S.models.groq==='openai/gpt-oss-120b')S.models.groq='auto';
 for(const p of ['groq','openrouter'])if(!S.models[p]||/whisper|tts|guard|embed|playai|orpheus|distil|audio|speech/i.test(S.models[p]))S.models[p]=DEF.models[p];
 
@@ -209,7 +211,8 @@ const PROV={
   groq:{name:'Groq',url:()=>'https://api.groq.com/openai/v1/chat/completions',link:'https://console.groq.com/keys'},
   openrouter:{name:'OpenRouter',url:()=>'https://openrouter.ai/api/v1/chat/completions',link:'https://openrouter.ai/keys'},
   pollinations:{name:'Pollinations',url:()=>S.keys.pollinations?'https://gen.pollinations.ai/v1/chat/completions':'https://text.pollinations.ai/openai',link:'https://enter.pollinations.ai'},
-  custom:{name:'Egen',url:()=>S.customUrl}
+  custom:{name:'Egen',url:()=>S.customUrl},
+  reserve:{name:'Reserv',url:()=>'https://openrouter.ai/api/v1/chat/completions'}
 };
 function provAuto(){const o=['groq','gemini','openrouter','pollinations','custom'].filter(p=>S.keys[p]&&(p!=='custom'||S.customUrl));return o}
 function provOrder(){
@@ -312,9 +315,13 @@ async function pickModel(p,lite){
 }
 let WAITEL=null;
 function waitStart(){const d=document.createElement('div');d.className='ev sys wait';d.innerHTML='<div class="bd">⏳ Väntar på AI-svar… <b>0 s</b></div>';feed.append(d);scrollEnd();const t0=Date.now();const iv=setInterval(()=>{const b=d.querySelector('b');if(b)b.textContent=Math.round((Date.now()-t0)/1000)+' s'},1000);return()=>{clearInterval(iv);d.remove()}}
-async function llm(messages){
+async function llm(messages,useRes){
   const stop=waitStart();
-  try{return await llm2(messages)}finally{stop()}
+  try{
+    if(useRes&&reserveOk()){S.keys.reserve=S.keys.openrouter;S.models.reserve=S.reserve.model;
+      try{return await callProvider('reserve',messages)}catch(e){if(isAbort(e))throw e;sys('⚠️ Reservmodellen svarade inte ('+e.message.slice(0,90)+') – kör vanliga')}}
+    return await llm2(messages);
+  }finally{stop()}
 }
 async function llm2(messages){
   let last;
@@ -518,14 +525,14 @@ function argSum(t,a={}){
   if(t==='save_file')return a.name;
   return a.query||a.url||a.prompt||clean(a.text).slice(0,90)||'';
 }
-async function runAgent(id,task,depth,msgs){
+async function runAgent(id,task,depth,msgs,forceRes){
   const A=AG[id];const max=depth?S.subSteps:S.maxSteps;
   const m=msgs||[{role:'system',content:''}];m.push({role:'user',content:task});
-  let fails=0,push=0;
+  let fails=0,push=0,useRes=!!forceRes;
   for(let step=0;step<max;step++){
     checkAbort();m[0].content=sysPrompt(A);compact(m);
     status(id,'Tänker…',1);
-    const raw=await llm(m);m.push({role:'assistant',content:raw});
+    const raw=await llm(m,useRes);m.push({role:'assistant',content:raw});
     const act=parseAction(raw);
     if(!act||(!act.tool&&act.final==null)){
       if(++fails>=2&&raw.trim()&&!act){status(id,'Klar',0,1);return raw.trim()}
@@ -536,6 +543,7 @@ async function runAgent(id,task,depth,msgs){
     if(act.final!=null&&!act.tool){
       const fin=typeof act.final==='string'?act.final:JSON.stringify(act.final,null,2);
       if(GIVEUP.test(fin.slice(0,700))&&push<3&&step<max-2){push++;
+        if(push>=2&&!useRes&&reserveOk()){useRes=true;emit(id,'hand',`🔁 <b>Reservmodellen</b> tar över för ${esc(A.name)}`,null,true);window.OFFICE?.log(id,'🔁 Reserv tar över');}
         emit(depth?'chef':id,'hand',depth?`💪 → <b>${esc(A.name)}</b>: Ge inte upp – hitta en annan väg!`:'💪 Ger inte upp – testar en ny strategi',null,true);
         window.OFFICE?.log(depth?'chef':id,'💪 Ge inte upp!');
         m.push({role:'user',content:'Avböj inte och ge inte upp. Det finns nästan alltid en annan väg: andra källor, sök efter ett öppet API eller RSS, read_page, skriv egen kod med run_js'+(A.tools.includes('delegate')?', delegera till en specialist eller anställ en ny':'')+'. Prova en helt ny strategi nu och leverera bästa möjliga resultat.'});continue}
@@ -567,7 +575,8 @@ async function delegate({agent,task,role},ctx){
   for(let tries=0;tries<2&&GIVEUP.test(r.slice(0,700));tries++){
     emit(ctx.agent,'hand',`🔁 → <b>${esc(AG[id].name)}</b>: Inte godkänt. Nytt försök med helt ny strategi!`,null,true);
     window.OFFICE?.handoff(ctx.agent,id);window.OFFICE?.log(ctx.agent,'🔁 Nytt försök: '+AG[id].name);
-    r=await runAgent(id,`${task}\n\nDITT FÖRRA FÖRSÖK GODKÄNDES INTE:\n${r.slice(0,1500)}\n\nAvböj inte. Använd en helt annan strategi (andra källor, öppna API:er, RSS, read_page, egen kod med run_js) och leverera ett konkret resultat.`,ctx.depth+1);
+    if(tries===1&&reserveOk()){emit(ctx.agent,'hand',`🔁 <b>Reservmodellen</b> tar över för ${esc(AG[id].name)}`,null,true);window.OFFICE?.log(id,'🔁 Reserv tar över')}
+    r=await runAgent(id,`${task}\n\nDITT FÖRRA FÖRSÖK GODKÄNDES INTE:\n${r.slice(0,1500)}\n\nAvböj inte. Använd en helt annan strategi (andra källor, öppna API:er, RSS, read_page, egen kod med run_js) och leverera ett konkret resultat.`,ctx.depth+1,null,tries===1);
   }
   const ev=emit(id,'done',`✅ Rapport till Chef`,null,true);detail(ev,r);
   return `RAPPORT från ${AG[id].name}:\n${r}`;
@@ -727,14 +736,34 @@ $('#bSet').onclick=()=>{
   <h4 class="sec">Egen leverantör</h4>
   <div class="fld"><label>URL (chat/completions)</label><input id="s_curl" value="${esc(S.customUrl)}" placeholder="https://…/v1/chat/completions"></div>
   <div class="row2"><div class="fld"><label>Nyckel</label><input type="password" id="k_custom" value="${esc(S.keys.custom)}"></div>${mod('custom','Modell')}</div>
+  <h4 class="sec">Reservmodell</h4>
+  <p class="hint">Tar över när en agent nekar ett uppdrag trots omtag. Du väljer själv modell via OpenRouter.</p>
+  <ol class="hint" style="padding-left:18px;margin-top:-4px"><li>Skapa konto och nyckel på <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:var(--pri)">openrouter.ai/keys</a></li><li>Klistra in nyckeln i <b>OpenRouter-nyckel</b> ovan</li><li>Tryck <b>Välj modell</b>, sök och tryck på en modell</li><li>Slå på reserven och tryck <b>Spara</b></li></ol>
+  <div class="fld"><label><input type="checkbox" id="r_on" ${S.reserve.on?'checked':''} style="width:auto;margin-right:8px;vertical-align:middle">Använd reservmodell</label></div>
+  <div class="fld"><label>Vald modell</label><input id="r_model" value="${esc(S.reserve.model)}" placeholder="Ingen vald"></div>
+  <button class="acts" id="r_pick" style="width:100%;padding:12px;border-radius:14px;background:var(--glass2);border:1px solid var(--line);margin:0">🔎 Välj modell</button>
+  <div id="r_list"></div>
   <h4 class="sec">Skrapning & gränser</h4>
   <div class="fld"><label>Egen CORS-proxy (valfri)</label><input id="s_proxy" value="${esc(S.proxy)}" placeholder="https://min-proxy.workers.dev/?url={url}"><small>{url} ersätts med sidans adress. Används före de publika proxyerna.</small></div>
   <div class="row2"><div class="fld"><label>Max steg – Chef</label><input type="number" id="s_ms" value="${S.maxSteps}" min="4" max="40"></div><div class="fld"><label>Max steg – agenter</label><input type="number" id="s_ss" value="${S.subSteps}" min="3" max="30"></div></div>
   <button class="prim" id="s_save">Spara</button>`);
+  $('#r_pick').onclick=async()=>{
+    const box=$('#r_list');box.innerHTML='<p class="hint">Hämtar modeller…</p>';
+    let list=[];try{const r=await fetch('https://openrouter.ai/api/v1/models');list=(await r.json()).data||[]}catch{box.innerHTML='<p class="hint">Kunde inte hämta listan. Kontrollera nätet.</p>';return}
+    list=list.filter(m=>(m.architecture?.output_modalities||['text']).includes('text'));
+    const price=m=>{const i=+m.pricing?.prompt*1e6,o=+m.pricing?.completion*1e6;return !i&&!o?'<i style="color:var(--ok);font-style:normal;font-weight:700">GRATIS</i>':`$${i.toFixed(2)} / $${o.toFixed(2)} per M`};
+    box.innerHTML=`<div class="fld"><input id="r_q" placeholder="Sök modell (namn eller beskrivning)…"></div><div id="r_res" style="max-height:340px;overflow:auto"></div>`;
+    const draw=q=>{q=q.toLowerCase();const hit=list.filter(m=>!q||(m.id+' '+m.name+' '+(m.description||'')).toLowerCase().includes(q)).slice(0,60);
+      $('#r_res').innerHTML=hit.map(m=>`<div class="hi" data-id="${esc(m.id)}"><b>${esc(m.name)}</b><span>${esc(m.id)} · ${price(m)} · ${Math.round((m.context_length||0)/1000)}k kontext</span></div>`).join('')||'<p class="hint">Inga träffar.</p>';
+      $('#r_res').querySelectorAll('.hi').forEach(el=>el.onclick=()=>{$('#r_model').value=el.dataset.id;$('#r_on').checked=true;box.innerHTML=`<p class="hint">✅ Vald: <b>${esc(el.dataset.id)}</b> – tryck Spara.</p>`})};
+    draw('');$('#r_q').oninput=e=>draw(e.target.value);$('#r_q').focus();
+  };
   $('#s_save').onclick=()=>{
     S.provider=$('#s_prov').value;['gemini','groq','openrouter','pollinations','custom'].forEach(p=>S.keys[p]=$('#k_'+p).value.trim());
     ['gemini','groq','openrouter','pollinations','custom'].forEach(p=>S.models[p]=$('#m_'+p).value.trim());
     S.customUrl=$('#s_curl').value.trim();S.proxy=$('#s_proxy').value.trim();
+    S.reserve={on:$('#r_on').checked,model:$('#r_model').value.trim()};
+    if(S.reserve.on&&!S.keys.openrouter)toast('Reserven kräver en OpenRouter-nyckel');
     S.maxSteps=Math.max(4,+$('#s_ms').value||16);S.subSteps=Math.max(3,+$('#s_ss').value||10);
     saveS();setProvBadge();closeSheet();toast('Sparat');
   };
