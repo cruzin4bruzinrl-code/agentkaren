@@ -232,6 +232,7 @@ async function callProvider(p,messages){
     if(S.models[p]==='auto'||(!S.models[p]&&p!=='custom')){const m=await nextModel(p);if(m){S.models[p]=m;saveS()}}
     const body={model:S.models[p]||undefined,messages,temperature:.4};
     if(/gpt-oss/.test(S.models[p]||''))body.reasoning_effort='low';
+    if(p==='openrouter'||p==='reserve')body.max_tokens=MAXTOK[p]||4096;
     if(p==='pollinations'&&!S.keys.pollinations)body.referrer='agentkaren';
     let url=P.url(),hdr={'Content-Type':'application/json',...(S.keys[p]?{Authorization:'Bearer '+S.keys[p]}:{})},payload=body;
     if(p==='gemini'){ // Googles eget API – stabilare CORS från webbläsare
@@ -266,6 +267,9 @@ async function callProvider(p,messages){
     if(!r.ok){
       const et=await r.text();
       if(r.status===400&&/reasoning/i.test(et)&&!NOREASON){NOREASON=true;continue}
+      if(r.status===402){const af=+(et.match(/afford\s+(\d+)/)?.[1]||0);
+        if(af>600&&a<3){MAXTOK[p]=Math.min(4096,Math.floor(af*.85));continue}
+        COOL[p]=Date.now()+10*60000;throw new Error(P.name+': krediterna räcker inte – fyll på på openrouter.ai eller välj en GRATIS-modell')}
       // Modellen utfasad? Byt automatiskt till den modell API:et föreslår, eller hämta en ny.
       if((r.status===404||r.status===400)&&/model/i.test(et)&&a<3){
         const sug=et.match(/use (?:models\/)?([\w.\-]+)/i)?.[1];
@@ -287,7 +291,7 @@ async function callProvider(p,messages){
   }
   throw new Error(P.name+': för många försök');
 }
-const PACE={gemini:4500,groq:1500},LAST={},TRIED=new Set(),COOL={};let NOREASON=false;
+const MAXTOK={},PACE={gemini:4500,groq:1500},LAST={},TRIED=new Set(),COOL={};let NOREASON=false;
 const chatOk=id=>!/whisper|tts|guard|embed|playai|orpheus|distil|audio|speech|transcri|moderation|image|vision-preview|compound|allam/i.test(id);
 const CHAT_PREF=[/kimi-k2/,/llama-4-maverick/,/llama-3\.3-70b/,/llama-4-scout/,/qwen3?-.*32b/,/gpt-oss-120b/,/gpt-oss-20b/,/deepseek/,/llama/];
 function rankChat(ids){const r=i=>{const k=CHAT_PREF.findIndex(x=>x.test(i));return k<0?99:k};return ids.filter(chatOk).sort((a,b)=>r(a)-r(b)||b.localeCompare(a,undefined,{numeric:true}))}
